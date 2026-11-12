@@ -1,0 +1,2 @@
+/usr/bin/ar qc libqwecpp_core.a CMakeFiles/qwecpp_core.dir/src/core/dtype.c.o CMakeFiles/qwecpp_core.dir/src/core/tensor.c.o
+/usr/bin/ranlib libqwecpp_core.a
