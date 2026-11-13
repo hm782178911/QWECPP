@@ -6,6 +6,15 @@ project(QWECPP
     LANGUAGES C
 )
 
+# 可执行文件输出到 build/bin/
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+# 静态库（.a）输出到 build/lib/
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
+# 共享库（.so）输出到 build/lib/
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
 # C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -29,10 +38,31 @@ add_library(qwecpp_core STATIC
     src/core/tensor.c
 )
 
+# add_library(qwecpp_core_static STATIC
+#     src/core/dtype.c
+#     src/core/tensor.c
+# )
+
+# add_library(qwecpp_core_shared SHARED
+#     src/core/dtype.c
+#     src/core/tensor.c
+# )
+
+
 target_include_directories(qwecpp_core
     PUBLIC
         ${PROJECT_SOURCE_DIR}/include
 )
+
+# target_include_directories(qwecpp_core_static
+#     PUBLIC
+#         ${PROJECT_SOURCE_DIR}/include
+# )
+
+# target_include_directories(qwecpp_core_shared
+#     PUBLIC
+#         ${PROJECT_SOURCE_DIR}/include
+# )
 
 # Unit tests
 enable_testing()
