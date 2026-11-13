@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/test_tensor.dir/tests/unit/test_tensor.c.o -o test_tensor  libqwecpp_core.a 
