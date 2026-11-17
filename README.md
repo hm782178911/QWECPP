@@ -1,14 +1,49 @@
 # QWECPP
 
-以 C/CUDA 为核心的原生 Qwen3 推理引擎。当前支持 batch=1、FP32 计算、原生中文多轮聊天，以及单卡、两卡 PP 和两卡 TP。Python 仅用于独立验证和性能测量，不进入推理链路。
+**Native LLM Inference Engine**
 
-支持本机 Qwen3-0.6B 和 Qwen3-8B。BF16/F16/F32 权重加载后统一转换为 FP32；同时支持单个 `model.safetensors` 和 `model.safetensors.index.json` 索引分片。模型目录须有 `config.json`，聊天另需 tokenizer 文件。
+*Build from the Metal Up.*
 
-默认上下文 **2048 token**，可配置至 **8192**，受模型位置上限约束。当前**没有 KV Cache**，每个新 token 重算完整上下文。仅支持未缩放 RoPE、无 attention bias、无模型 Sliding Window Attention 的 Qwen3 SiLU 文本架构。聊天历史滑动窗口是另一个独立选项。
+QWECPP 是一个以 C / CUDA 为核心的 LLM 推理引擎。从 Qwen3-0.6B 出发，逐步实现权重加载、GPU 算子、端到端推理与多 GPU 执行，目前已支持 Qwen3-8B。
 
-## 构建
+项目的核心目标是理解并实现 LLM 推理的底层基础设施。Python 只用于参考验证和性能分析，不进入推理执行链路。
 
-基础依赖：CMake、C/C++ 编译器。CUDA 路径需要 CUDA Toolkit/cuBLAS；聊天还需要 PCRE2 和 ICU。默认 CUDA 关闭。
+[项目目标](#1-project-goals) · [当前进展](#2-current-progress) · [快速开始](#3-quick-start) · [项目结构](#4-project-structure) · [技术栈](#5-technology-stack) · [验证与性能](#6-validation--benchmarks) · [开发路线](#7-roadmap) · [文档](#8-documentation)
+
+---
+
+## 1. Project Goals
+
+- 使用 C / CUDA C++ 实现原生 LLM 推理。
+- 自主实现关键 GPU 算子，以 cuBLAS 完成当前 Linear / GEMM。
+- 从单 GPU 扩展到 PP、TP 等多 GPU 执行方式。
+- 每项优化都先验证正确性，再用固定基线做定量分析。
+
+## 2. Current Progress
+
+| 模块 | 当前状态 |
+| --- | --- |
+| Tensor 与内存 | CPU / CUDA 元数据、设备编号、显存和 CPU 输出所有权 |
+| 权重加载 | Safetensors 单文件、索引多分片；BF16 / FP16 / FP32 → FP32 |
+| 模型 | Qwen3-0.6B、Qwen3-8B，batch = 1 |
+| GPU 算子 | Embedding、RMSNorm、RoPE、因果 GQA、SwiGLU、残差、Linear |
+| 原生聊天 | Tokenizer、多轮历史、流式 UTF-8 输出、贪心解码 |
+| 多 GPU | 两卡 PP 按层执行、两卡 TP 按 head / MLP 通道切分 |
+| 上下文 | 默认 **2048 token**，`--max-context` 可配置至 **8192** |
+| 历史管理 | 可选滑动窗口，默认关闭 |
+| 性能诊断 | 首 token / 首文本延迟、TPOT、吞吐、TP 通信统计 |
+
+**当前边界：** 尚无 KV Cache，每个新 token 都重算上下文；PP 暂无多请求流水线重叠，TP 暂无 NCCL 或显式通信计算重叠。不支持 PP + TP 混合，也不承诺单请求加速。
+
+模型支持范围为 Qwen3 SiLU 文本架构：未缩放 RoPE、无 attention bias、无模型 Sliding Window Attention。聊天历史裁剪与模型的窗口注意力是不同功能。
+
+## 3. Quick Start
+
+### 3.1 构建
+
+基础依赖为 CMake、C/C++ 编译器。GPU 推理需要 CUDA Toolkit / cuBLAS；聊天另需 PCRE2 和 ICU。
+
+纯 C 基础模块：
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -16,7 +51,8 @@ cmake --build build -j8
 ctest --test-dir build --output-on-failure
 ```
 
-本机 GPU 为 RTX PRO 6000 Blackwell Max-Q，当前 CUDA/chat 构建示例：
+<details>
+<summary>本机 CUDA + 原生聊天构建配置</summary>
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
@@ -29,107 +65,133 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
 cmake --build build -j8
 ```
 
-其他设备请调整架构和库路径。`QWECPP_ENABLE_CHAT=OFF` 可只构建 CUDA 前向；`QWECPP_ENABLE_CUDA=OFF` 保留纯 C 功能。本机复用环境库，构建后需保留相应动态库路径。
+本机 GPU 为 RTX PRO 6000 Blackwell Max-Q。其他环境请调整 CUDA 架构和依赖路径；运行时需能找到相应动态库。CUDA 默认关闭；`QWECPP_ENABLE_CHAT=OFF` 可只构建 GPU 前向。
 
-## 聊天与前向
+</details>
+
+### 3.2 开始聊天
+
+**单卡 Qwen3-0.6B：**
 
 ```bash
-# 单卡（省略 --devices 使用当前 CUDA 设备）
-./build/bin/qwecpp_chat --model /home/hzy/models/Qwen/Qwen3-0.6B --devices 0
-
-# 8B 两卡 TP
-./build/bin/qwecpp_chat --model /home/hzy/models/Qwen/Qwen3-8B \
-  --parallel tp --devices 0,1 --max-context 4096 --max-new-tokens 128 --debug
-
-# 两卡 PP，第二阶段从第 14 层开始（0 起编号）
-./build/bin/qwecpp_chat --model /home/hzy/models/Qwen/Qwen3-0.6B \
-  --parallel pp --devices 0,1 --split-layer 14
-
-# token ID 前向，输出所有位置的 FP32 logits
-./build/bin/qwecpp_forward --model /home/hzy/models/Qwen/Qwen3-8B \
-  --tokens 9707,11,1879,0 --parallel tp --devices 0,1 \
-  --max-context 2048 --output /tmp/qwen3-logits.bin
+./build/bin/qwecpp_chat --model /home/hzy/models/Qwen/Qwen3-0.6B
 ```
 
-聊天默认非思考、贪心解码，输入一行即生成；`/clear` 清空历史，`/exit`、`/quit` 或 EOF 退出。不执行任意 Jinja 模板，不支持工具调用或多模态。权重在模型实例生命周期内常驻。
+**两卡 TP，运行 Qwen3-8B：**
 
-|参数|默认值|含义|
-|---|---|---|
-|`--devices`|当前设备|一个或两个不同设备；支持 `1,0` 反序|
-|`--parallel pp\|tp`|pp|两卡时默认按层 PP；TP 必须显式选择并指定两卡|
-|`--split-layer N`|均分层|仅两卡 PP；边界须位于模型层范围内部|
-|`--max-context N`|2048|1..8192，再取模型位置上限；模板、历史、输入与输出共用|
-|`--max-new-tokens N`|128|聊天每轮最多输出 1..256 token，遇 EOS 可提前结束|
-|`--sliding-window`|关闭|聊天历史超限时移除最早完整轮次，为输出预留空间|
-|`--debug`|关闭|聊天正常退出时向 stderr 打印性能统计|
-|`--pp-host-transfer`|关闭|PP/TP 强制固定页主机中转，用于诊断|
+```bash
+./build/bin/qwecpp_chat \
+  --model /home/hzy/models/Qwen/Qwen3-8B \
+  --parallel tp --devices 0,1 --max-context 4096 --debug
+```
 
-未开启滑动窗口时，超限输入被拒绝，不污染历史；开启后按 `min(max-new-tokens, context_limit-1)` 预留空间，当前问题单独仍放不下则拒绝。删除历史会提示，模型会忘记被移除内容。滑动窗口策略后续再优化。
+**两卡 PP：**
 
-`qwecpp_forward --output` 可省略，输出文件是 row-major `[token_count,vocab_size]` 原生 FP32，无文件头。聊天仅投影最后位置，再由 CPU argmax 选 token。可复用 C++ API 见 `include/models/qwen3.cuh`。
+```bash
+./build/bin/qwecpp_chat \
+  --model /home/hzy/models/Qwen/Qwen3-0.6B \
+  --parallel pp --devices 0,1 --split-layer 14
+```
 
-## PP 与 TP
+输入一行后回车即可生成回复。`/clear` 清空历史，`/exit` 或 EOF 退出。默认非思考、贪心解码，不支持工具调用和多模态。
 
-PP 按连续层切两阶段，首阶段持有 Embedding，末阶段持有最终 RMSNorm/LM Head。同一请求顺序执行，没有多请求/微批流水线重叠。
+### 3.3 常用参数
 
-TP 将 Q/K/V、Gate/Up 按输出维分片，O/Down 按输入维分片；Attention/MLP 局部输出各求和一次。每卡持有完整残差状态，Embedding/归一化/词表头复制，最终仅 rank 0 做词表投影。Q heads、KV heads 和 intermediate 必须能被 2 整除；不支持与 split-layer 混用。
+| 参数 | 默认值 | 用途 |
+| --- | --- | --- |
+| `--devices 0,1` | 当前 CUDA 设备 | 指定一张或两张不同 GPU |
+| `--parallel pp` / `--parallel tp` | pp | 两卡执行方式；TP 需显式选择 |
+| `--max-context 4096` | 2048 | 输入、模板、历史和回复共用的上下文上限，最高 8192 |
+| `--max-new-tokens 128` | 128 | 每轮最多生成的 token 数，范围 1..256 |
+| `--sliding-window` | 关闭 | 空间不足时移除最早完整对话轮次 |
+| `--debug` | 关闭 | 退出时打印每轮性能与 TP 通信指标 |
 
-两者复用 P2P 优先的 transfer，保留首次完整性校验及主机回退。历史 peer copy 数据异常已通过一次性 `iommu=pt` 启动对照恢复正确性；未改 BIOS 或永久启动配置，重启后需重新确认。仓库保留完整性校验与回退。本次 TP 检查全部走 P2P。当前无 NCCL、PP+TP 组合或显式通信计算重叠，不承诺单请求加速。
+开启滑动窗口会为输出预留空间，超长的单个问题仍会被拒绝。模型原生位置上限可能高于 8192，但当前 kernel 支持上限为 8192。
 
-## Debug 指标与性能基线
+更多选项、token ID 前向和输出文件格式见 [命令行参考](docs/usage-reference.md)。
 
-统计在正常退出时统一打印，`/clear` 不清统计。首轮可能包含 CUDA/cuBLAS 惰性初始化，性能比较应预热并固定输入/输出长度。
+## 4. Project Structure
 
-|字段|口径|
-|---|---|
-|`load_ms`|tokenizer 与模型初始化耗时|
-|`input_tokens` / `output_tokens`|输入长度 / 实际非 EOS 生成数量|
-|`dropped_turns`|本轮移除的历史轮数|
-|`ttft_ms`|从分词前到首个非 EOS token 选择完成|
-|`first_text_ms`|到首段完整 UTF-8 文本输出完成|
-|`total_ms` / `output_tok_s`|整轮耗时（含终止 EOS 检查）/ 输出 token 数除以整轮秒数|
-|`tpot_ms`|首末非 EOS token 间平均间隔；不足两 token 为 -1|
-|`tp_transfer_calls` / `tp_transfer_bytes`|单向传输次数 / 双向逻辑 payload 总字节|
-|`tp_p2p_calls` / `tp_host_calls`|最终完成传输的路径次数|
-|`tp_transfer_ms`|transfer 调用墙钟时间总和，含同步|
-|`tp_source_wait_ms`|其中等待源设备同步的时间|
-|`tp_transfer_rest_ms`|扣除源等待后，仍含路由、锁、分配、复制、目标同步和首次校验|
-|`tp_transfer_pct`|transfer 调用耗时占整轮耗时比例|
+```text
+QWECPP/
+├── include/                # 公共接口
+│   ├── core/               # DType、Tensor 与 CPU 输出所有权
+│   ├── backend/cuda/       # CUDA 设备、显存与跨卡传输
+│   ├── loader/             # Safetensors / 分片权重接口
+│   ├── models/             # Qwen3 模型接口
+│   ├── operators/          # Tensor 算子接口
+│   └── runtime/            # Tokenizer、设备选项
+├── src/                    # 对应模块的实现
+├── kernels/                # CUDA kernel，按运算类型组织
+├── tools/                  # chat、forward、inspect、tokenize CLI
+├── tests/                  # 单元、算子与模型参考测试
+├── benchmarks/             # 模型基线与独立通信实验
+├── dev-notes/              # 按日期整理的开发记录
+├── docs/                   # 架构、设计与使用参考
+├── third_party/            # cJSON 源码与许可证
+└── CMakeLists.txt
+```
 
-无非 EOS 输出时首 token/首文本延迟为 -1。每次 TP 前向有 `4×层数` 次单向传输，逻辑字节为 `4×层数×上下文长度×hidden_size×sizeof(float)`，包含终止判断的前向。字节不含重试/校验/主机多段实际流量；耗时不能作为纯 DMA 时间或物理带宽，比例也不是纯通信造成的性能损失。单卡/PP 的 TP 字段为零。诊断会引入计时开销。
+模型层组织计算顺序，算子层校验 Tensor 并调度，kernel 层执行 GPU 运算。Tensor 描述数据，DeviceTensor / HostTensor 管理数据内存。详细职责见 [架构说明](docs/architecture.md)。
 
-保留的 [无 KV Cache 基线](benchmarks/baselines/2026-11-17-no-kv/README.md) 含逐次数据、环境、源码哈希/快照。其上下文为 256；复现需显式 `--max-context 256`。`tests/models/record_baseline.py [新目录]` 新建独立归档，拒绝覆盖已有目录。早期 [外部首字符测量](docs/tp-chat-benchmark.json) 与内部 token 计时口径不同，不直接混用。
+## 5. Technology Stack
 
-## 验证
+| 技术 | 用途 |
+| --- | --- |
+| C11 | 基础数据结构、单文件 Safetensors Reader |
+| C++17 / CUDA C++ | 模型、资源管理、Tokenizer 与 GPU kernel |
+| cuBLAS | 当前 Linear / GEMM 后端 |
+| CUDA P2P / pinned memory | 跨卡传输及回退路径 |
+| PCRE2 / ICU | 原生分词的正则与 Unicode 处理 |
+| CMake / CTest | 构建与基础测试 |
+| Python / Transformers | 独立参考、回归与性能分析 |
+
+JSON 使用随仓库提供的 cJSON 1.7.19，保留 MIT 许可证。NCCL 尚未接入。
+
+## 6. Validation & Benchmarks
+
+### 正确性验证
 
 ```bash
 ctest --test-dir build --output-on-failure
-PY=/home/hzy/miniforge3/envs/llm_py312/bin/python
-$PY tests/models/test_forward.py build/bin/qwecpp_forward /home/hzy/models/Qwen/Qwen3-0.6B
-$PY tests/models/test_tp.py
-$PY tests/models/test_chat_debug.py
-$PY tests/models/test_tp_debug.py
-$PY tests/models/test_sliding_window.py
-$PY tests/models/test_long_context.py
-$PY tests/models/test_forward.py build/bin/qwecpp_forward /home/hzy/models/Qwen/Qwen3-8B 0.001
-$PY tests/models/test_sharded_model.py build/bin/qwecpp_forward /home/hzy/models/Qwen/Qwen3-8B
-$PY tests/models/test_long_reference.py /home/hzy/models/Qwen/Qwen3-8B 512
+
+# 本机双卡 TP 对单卡回归
+/home/hzy/miniforge3/envs/llm_py312/bin/python tests/models/test_tp.py
 ```
 
-另有 `test_pp.py`、`test_tokenizer.py`、`test_chat.py`，参数为可执行文件和模型目录；聊天测试可追加运行选项。部分专项脚本使用本机路径及双卡条件。
+验证覆盖模型 logits、Tokenizer、多轮聊天、PP / TP、通信、滑动窗口和长上下文。0.6B 与 8B 采用独立数值容差；8192-token 算子测试不等于所有模型在该长度都做过全 logits 验证。
 
-0.6B TP 全 logits 使用 atol=3e-4、rtol=1e-4；8B 对 Transformers FP32 使用 atol=1e-3，TP 对单卡使用 atol=2e-3，rtol 均为 1e-4。原 0.6B 容差未放宽。已验证范围、实际误差和局限见 [本次开发记录](dev-notes/2026-11-17-tp-and-runtime.md)。8192 算子测试不代表所有模型在该长度的全 logits 都已验证。
+完整命令及容差见 [验证参考](docs/usage-reference.md#验证)，实测误差见 [开发记录](dev-notes/2026-11-17-tp-and-runtime.md)。
 
-## 项目结构与后续工作
+### 性能记录
 
-`include/core`：非拥有型 Tensor 元数据；`DeviceTensor`/`HostTensor` 管理数据生命周期。`src/operators` 校验并调度；`kernels` 放 CUDA 实现；`src/models` 组织前向；`src/runtime`/`tools` 负责 tokenizer 与聊天；`include/loader`/`src/loader` 负责权重读取。
+`--debug` 在退出时向 stderr 输出 TTFT、首文本延迟、TPOT、token/s 和 TP 通信计数/耗时。通信计时含同步等待，不能当作纯链路带宽；首轮冷启动应与预热后的结果分开。
 
+- [无 KV Cache 模型基线](benchmarks/baselines/2026-11-17-no-kv/README.md)：逐次数据、环境、源码快照；旧上下文口径为 256。
+- [P2P / 主机中转实验](benchmarks/p2p/2026-11-17/)：独立测试源码和日志。
+- [指标口径](docs/usage-reference.md#debug-指标与性能基线)：计时边界与逻辑字节定义。
+
+本机 P2P 曾因 IOMMU 地址转换出现数据错误，一次性 `iommu=pt` 启动对照后恢复。未永久配置，重启后需重新确认；引擎保留完整性校验和主机回退。
+
+## 7. Roadmap
+
+| 阶段 | 目标 | 进展 |
+| --- | --- | --- |
+| Phase 1 | 基础 Tensor、权重读取 | 已实现，含多分片 |
+| Phase 2 | CUDA 后端与内存管理 | 基础实现完成 |
+| Phase 3 | 核心 GPU 算子 | 正确性参考实现完成，性能待优化 |
+| Phase 4 | Qwen3 端到端推理 | 0.6B / 8B、原生聊天可用 |
+| Phase 5 | 多 GPU 执行 | 两卡 PP / TP 基础实现完成 |
+| Phase 6 | 推理性能优化 | 待实现 KV Cache、prefill / decode 分离与通信优化 |
+| Phase 7 | 更多架构与执行能力 | 后续扩展 |
+
+近期重点是抽取公共并行算子与 ParallelContext、复用工作区，再逐项量化 KV Cache、算子和通信优化的收益。滑动窗口策略后续再优化。
+
+## 8. Documentation
+
+- [开发记录索引](dev-notes/README.md)
+- [2026-11-17 跨对话更新总览](dev-notes/2026-11-17-overview.md)
+- [TP、诊断、8B 与长上下文详细记录](dev-notes/2026-11-17-tp-and-runtime.md)
 - [架构说明](docs/architecture.md)
-- [开发记录目录](dev-notes/README.md)
-- [今日跨对话总览：PP、P2P 修复与 TP](dev-notes/2026-11-17-overview.md)
-- [P2P/主机中转带宽实验源码与原始日志](benchmarks/p2p/2026-11-17/)
-- [PP 设计](docs/pp-design.md)、[TP 初始设计](docs/tp-design.md)
-
-下一步重点：抽取公共并行算子/Context、复用工作区、KV Cache、分离 prefill/decode、通信与算子优化，逐项沿用固定基线量化。滑动策略优化暂缓。
-
-Safetensors Reader 支持 F32/F16/BF16/I8/I32/I64、最多 4 维（含标量/空张量），数据借用 mmap，关闭后失效；Qwen3.5 的高维权重不在支持范围。JSON 使用随仓库提供的 cJSON 1.7.19，保留 MIT 许可证；header 上限 100 MB，拒绝超过 double 精确整数范围的维度/偏移。`qwecpp_inspect` 仍检查单个 Safetensors（目录默认 model.safetensors），并非多分片汇总工具。
+- [命令行与诊断参考](docs/usage-reference.md)
+- [PP 设计](docs/pp-design.md) / [TP 初始设计](docs/tp-design.md)
