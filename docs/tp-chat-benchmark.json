@@ -1,0 +1,149 @@
+{
+  "prompt": "请介绍一下什么是大语言模型，并说明它的用途。",
+  "max_new_tokens": 32,
+  "warmups": 1,
+  "repeats": 5,
+  "results": {
+    "single": {
+      "load_seconds": 0.6830354409999018,
+      "runs": [
+        {
+          "ttft_ms": 4.474851999930252,
+          "total_ms": 150.7212569999865,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 212.31245437398962,
+          "post_first_ms_per_token": 4.71762596774375
+        },
+        {
+          "ttft_ms": 4.487490999963484,
+          "total_ms": 159.55540699997073,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 200.55728979467222,
+          "post_first_ms_per_token": 5.002190838709911
+        },
+        {
+          "ttft_ms": 4.371037000055367,
+          "total_ms": 150.5435110000235,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 212.56313066854807,
+          "post_first_ms_per_token": 4.715241096773165
+        },
+        {
+          "ttft_ms": 4.352638000000297,
+          "total_ms": 150.4367600000478,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 212.7139669851294,
+          "post_first_ms_per_token": 4.712391032259597
+        },
+        {
+          "ttft_ms": 4.32838200003971,
+          "total_ms": 150.43629000001602,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 212.71463155596695,
+          "post_first_ms_per_token": 4.713158322579881
+        }
+      ],
+      "median": {
+        "ttft_ms": 4.371037000055367,
+        "total_ms": 150.5435110000235,
+        "output_tokens_reencoded": 32,
+        "output_tok_s": 212.56313066854807,
+        "post_first_ms_per_token": 4.715241096773165
+      }
+    },
+    "pp": {
+      "load_seconds": 0.6668216109999321,
+      "runs": [
+        {
+          "ttft_ms": 4.513200000019424,
+          "total_ms": 157.19598000009682,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 203.56754670176863,
+          "post_first_ms_per_token": 4.925250967744432
+        },
+        {
+          "ttft_ms": 4.417084999886356,
+          "total_ms": 167.53879199995936,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 191.00054153433172,
+          "post_first_ms_per_token": 5.261990548389452
+        },
+        {
+          "ttft_ms": 4.4562450000285025,
+          "total_ms": 157.15501800013953,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 203.62060599281398,
+          "post_first_ms_per_token": 4.925766870971324
+        },
+        {
+          "ttft_ms": 4.430286000115302,
+          "total_ms": 157.0227800000339,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 203.79208672775437,
+          "post_first_ms_per_token": 4.922338516126406
+        },
+        {
+          "ttft_ms": 4.415682999933779,
+          "total_ms": 170.64263800011759,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 187.52640239878352,
+          "post_first_ms_per_token": 5.362159838715606
+        }
+      ],
+      "median": {
+        "ttft_ms": 4.430286000115302,
+        "total_ms": 157.19598000009682,
+        "output_tokens_reencoded": 32,
+        "output_tok_s": 203.56754670176863,
+        "post_first_ms_per_token": 4.925766870971324
+      }
+    },
+    "tp": {
+      "load_seconds": 0.6631439049999699,
+      "runs": [
+        {
+          "ttft_ms": 6.667850999974689,
+          "total_ms": 224.53058800010695,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 142.5195572907187,
+          "post_first_ms_per_token": 7.027830225810718
+        },
+        {
+          "ttft_ms": 6.993819999934203,
+          "total_ms": 236.28675299983115,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 135.42866704856226,
+          "post_first_ms_per_token": 7.396546225803127
+        },
+        {
+          "ttft_ms": 6.593220000013389,
+          "total_ms": 224.50975799984008,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 142.5327802456711,
+          "post_first_ms_per_token": 7.029565741929893
+        },
+        {
+          "ttft_ms": 6.570305999957782,
+          "total_ms": 224.49153999991722,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 142.54434710551587,
+          "post_first_ms_per_token": 7.029717225805143
+        },
+        {
+          "ttft_ms": 6.533288999889919,
+          "total_ms": 234.248333999858,
+          "output_tokens_reencoded": 32,
+          "output_tok_s": 136.60716152636286,
+          "post_first_ms_per_token": 7.345646612902196
+        }
+      ],
+      "median": {
+        "ttft_ms": 6.593220000013389,
+        "total_ms": 224.53058800010695,
+        "output_tokens_reencoded": 32,
+        "output_tok_s": 142.5195572907187,
+        "post_first_ms_per_token": 7.029717225805143
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+[debug] load_ms=616.505
+[debug] turn=1 input_tokens=23 output_tokens=32 ttft_ms=68.986 first_text_ms=68.998 total_ms=215.597 output_tok_s=148.425 tpot_ms=4.729
+[debug] turn=2 input_tokens=23 output_tokens=32 ttft_ms=4.393 first_text_ms=4.395 total_ms=150.320 output_tok_s=212.879 tpot_ms=4.707
+[debug] turn=3 input_tokens=23 output_tokens=32 ttft_ms=4.275 first_text_ms=4.277 total_ms=150.183 output_tok_s=213.074 tpot_ms=4.707
+[debug] turn=4 input_tokens=23 output_tokens=32 ttft_ms=4.282 first_text_ms=4.284 total_ms=166.299 output_tok_s=192.424 tpot_ms=5.226
+[debug] turn=5 input_tokens=23 output_tokens=32 ttft_ms=4.290 first_text_ms=4.292 total_ms=150.252 output_tok_s=212.976 tpot_ms=4.708
+[debug] turn=6 input_tokens=23 output_tokens=32 ttft_ms=4.308 first_text_ms=4.310 total_ms=150.261 output_tok_s=212.962 tpot_ms=4.708

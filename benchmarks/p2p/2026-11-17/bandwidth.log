@@ -1,0 +1,16 @@
+0->1 MiB=1 mode=p2p best_GBps=42.418 mean_GBps=42.311 mismatches=0 reps=512 trials=5
+0->1 MiB=1 mode=host_serial best_GBps=22.312 mean_GBps=22.287 mismatches=0 reps=512 trials=5
+0->1 MiB=16 mode=p2p best_GBps=55.043 mean_GBps=54.921 mismatches=0 reps=32 trials=5
+0->1 MiB=16 mode=host_serial best_GBps=27.885 mean_GBps=27.878 mismatches=0 reps=32 trials=5
+0->1 MiB=64 mode=p2p best_GBps=55.893 mean_GBps=55.795 mismatches=0 reps=10 trials=5
+0->1 MiB=64 mode=host_serial best_GBps=28.229 mean_GBps=28.226 mismatches=0 reps=10 trials=5
+0->1 MiB=256 mode=p2p best_GBps=56.090 mean_GBps=55.897 mismatches=0 reps=10 trials=5
+0->1 MiB=256 mode=host_serial best_GBps=28.326 mean_GBps=28.324 mismatches=0 reps=10 trials=5
+1->0 MiB=1 mode=p2p best_GBps=44.792 mean_GBps=44.679 mismatches=0 reps=512 trials=5
+1->0 MiB=1 mode=host_serial best_GBps=22.500 mean_GBps=22.246 mismatches=0 reps=512 trials=5
+1->0 MiB=16 mode=p2p best_GBps=54.832 mean_GBps=54.671 mismatches=0 reps=32 trials=5
+1->0 MiB=16 mode=host_serial best_GBps=27.881 mean_GBps=27.875 mismatches=0 reps=32 trials=5
+1->0 MiB=64 mode=p2p best_GBps=54.925 mean_GBps=54.550 mismatches=0 reps=10 trials=5
+1->0 MiB=64 mode=host_serial best_GBps=28.229 mean_GBps=28.223 mismatches=0 reps=10 trials=5
+1->0 MiB=256 mode=p2p best_GBps=54.154 mean_GBps=53.415 mismatches=0 reps=10 trials=5
+1->0 MiB=256 mode=host_serial best_GBps=28.326 mean_GBps=28.324 mismatches=0 reps=10 trials=5

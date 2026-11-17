@@ -1,0 +1,522 @@
+[
+  {
+    "mode": "single",
+    "case": "short",
+    "prompt": "请介绍一下什么是大语言模型，并说明它的用途。",
+    "argv": [
+      "/home/hzy/project/QWECPP/build/bin/qwecpp_chat",
+      "--model",
+      "/home/hzy/models/Qwen/Qwen3-0.6B",
+      "--max-new-tokens",
+      "32",
+      "--debug",
+      "--devices",
+      "0"
+    ],
+    "warmup": {
+      "turn": 1.0,
+      "input_tokens": 23.0,
+      "output_tokens": 32.0,
+      "ttft_ms": 68.986,
+      "first_text_ms": 68.998,
+      "total_ms": 215.597,
+      "output_tok_s": 148.425,
+      "tpot_ms": 4.729
+    },
+    "runs": [
+      {
+        "turn": 2.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.393,
+        "first_text_ms": 4.395,
+        "total_ms": 150.32,
+        "output_tok_s": 212.879,
+        "tpot_ms": 4.707
+      },
+      {
+        "turn": 3.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.275,
+        "first_text_ms": 4.277,
+        "total_ms": 150.183,
+        "output_tok_s": 213.074,
+        "tpot_ms": 4.707
+      },
+      {
+        "turn": 4.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.282,
+        "first_text_ms": 4.284,
+        "total_ms": 166.299,
+        "output_tok_s": 192.424,
+        "tpot_ms": 5.226
+      },
+      {
+        "turn": 5.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.29,
+        "first_text_ms": 4.292,
+        "total_ms": 150.252,
+        "output_tok_s": 212.976,
+        "tpot_ms": 4.708
+      },
+      {
+        "turn": 6.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.308,
+        "first_text_ms": 4.31,
+        "total_ms": 150.261,
+        "output_tok_s": 212.962,
+        "tpot_ms": 4.708
+      }
+    ],
+    "median": {
+      "input_tokens": 23.0,
+      "output_tokens": 32.0,
+      "ttft_ms": 4.29,
+      "first_text_ms": 4.292,
+      "total_ms": 150.261,
+      "output_tok_s": 212.962,
+      "tpot_ms": 4.708
+    }
+  },
+  {
+    "mode": "single",
+    "case": "long",
+    "prompt": "背景资料：大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。 请简要总结上述资料。",
+    "argv": [
+      "/home/hzy/project/QWECPP/build/bin/qwecpp_chat",
+      "--model",
+      "/home/hzy/models/Qwen/Qwen3-0.6B",
+      "--max-new-tokens",
+      "32",
+      "--debug",
+      "--devices",
+      "0"
+    ],
+    "warmup": {
+      "turn": 1.0,
+      "input_tokens": 179.0,
+      "output_tokens": 19.0,
+      "ttft_ms": 78.368,
+      "first_text_ms": 78.38,
+      "total_ms": 341.952,
+      "output_tok_s": 55.563,
+      "tpot_ms": 13.79
+    },
+    "runs": [
+      {
+        "turn": 2.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.722,
+        "first_text_ms": 13.725,
+        "total_ms": 300.085,
+        "output_tok_s": 63.315,
+        "tpot_ms": 15.059
+      },
+      {
+        "turn": 3.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.619,
+        "first_text_ms": 13.622,
+        "total_ms": 276.904,
+        "output_tok_s": 68.616,
+        "tpot_ms": 13.775
+      },
+      {
+        "turn": 4.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.613,
+        "first_text_ms": 13.617,
+        "total_ms": 312.199,
+        "output_tok_s": 60.859,
+        "tpot_ms": 15.738
+      },
+      {
+        "turn": 5.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.668,
+        "first_text_ms": 13.672,
+        "total_ms": 276.919,
+        "output_tok_s": 68.612,
+        "tpot_ms": 13.774
+      },
+      {
+        "turn": 6.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.63,
+        "first_text_ms": 13.639,
+        "total_ms": 305.189,
+        "output_tok_s": 62.257,
+        "tpot_ms": 15.347
+      }
+    ],
+    "median": {
+      "input_tokens": 179.0,
+      "output_tokens": 19.0,
+      "ttft_ms": 13.63,
+      "first_text_ms": 13.639,
+      "total_ms": 300.085,
+      "output_tok_s": 63.315,
+      "tpot_ms": 15.059
+    }
+  },
+  {
+    "mode": "pp",
+    "case": "short",
+    "prompt": "请介绍一下什么是大语言模型，并说明它的用途。",
+    "argv": [
+      "/home/hzy/project/QWECPP/build/bin/qwecpp_chat",
+      "--model",
+      "/home/hzy/models/Qwen/Qwen3-0.6B",
+      "--max-new-tokens",
+      "32",
+      "--debug",
+      "--devices",
+      "0,1"
+    ],
+    "warmup": {
+      "turn": 1.0,
+      "input_tokens": 23.0,
+      "output_tokens": 32.0,
+      "ttft_ms": 83.846,
+      "first_text_ms": 83.857,
+      "total_ms": 236.906,
+      "output_tok_s": 135.074,
+      "tpot_ms": 4.937
+    },
+    "runs": [
+      {
+        "turn": 2.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.453,
+        "first_text_ms": 4.456,
+        "total_ms": 161.873,
+        "output_tok_s": 197.686,
+        "tpot_ms": 5.078
+      },
+      {
+        "turn": 3.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.374,
+        "first_text_ms": 4.376,
+        "total_ms": 156.846,
+        "output_tok_s": 204.022,
+        "tpot_ms": 4.918
+      },
+      {
+        "turn": 4.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.361,
+        "first_text_ms": 4.364,
+        "total_ms": 156.849,
+        "output_tok_s": 204.018,
+        "tpot_ms": 4.919
+      },
+      {
+        "turn": 5.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.363,
+        "first_text_ms": 4.365,
+        "total_ms": 169.938,
+        "output_tok_s": 188.304,
+        "tpot_ms": 5.341
+      },
+      {
+        "turn": 6.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 4.368,
+        "first_text_ms": 4.37,
+        "total_ms": 156.775,
+        "output_tok_s": 204.114,
+        "tpot_ms": 4.916
+      }
+    ],
+    "median": {
+      "input_tokens": 23.0,
+      "output_tokens": 32.0,
+      "ttft_ms": 4.368,
+      "first_text_ms": 4.37,
+      "total_ms": 156.849,
+      "output_tok_s": 204.018,
+      "tpot_ms": 4.919
+    }
+  },
+  {
+    "mode": "pp",
+    "case": "long",
+    "prompt": "背景资料：大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。 请简要总结上述资料。",
+    "argv": [
+      "/home/hzy/project/QWECPP/build/bin/qwecpp_chat",
+      "--model",
+      "/home/hzy/models/Qwen/Qwen3-0.6B",
+      "--max-new-tokens",
+      "32",
+      "--debug",
+      "--devices",
+      "0,1"
+    ],
+    "warmup": {
+      "turn": 1.0,
+      "input_tokens": 179.0,
+      "output_tokens": 19.0,
+      "ttft_ms": 102.603,
+      "first_text_ms": 102.614,
+      "total_ms": 387.638,
+      "output_tok_s": 49.015,
+      "tpot_ms": 14.933
+    },
+    "runs": [
+      {
+        "turn": 2.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 14.605,
+        "first_text_ms": 14.608,
+        "total_ms": 308.531,
+        "output_tok_s": 61.582,
+        "tpot_ms": 15.427
+      },
+      {
+        "turn": 3.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 14.515,
+        "first_text_ms": 14.518,
+        "total_ms": 295.227,
+        "output_tok_s": 64.357,
+        "tpot_ms": 14.693
+      },
+      {
+        "turn": 4.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 14.508,
+        "first_text_ms": 14.512,
+        "total_ms": 313.433,
+        "output_tok_s": 60.619,
+        "tpot_ms": 15.706
+      },
+      {
+        "turn": 5.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 14.502,
+        "first_text_ms": 14.506,
+        "total_ms": 295.178,
+        "output_tok_s": 64.368,
+        "tpot_ms": 14.692
+      },
+      {
+        "turn": 6.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 14.485,
+        "first_text_ms": 14.488,
+        "total_ms": 313.232,
+        "output_tok_s": 60.658,
+        "tpot_ms": 15.696
+      }
+    ],
+    "median": {
+      "input_tokens": 179.0,
+      "output_tokens": 19.0,
+      "ttft_ms": 14.508,
+      "first_text_ms": 14.512,
+      "total_ms": 308.531,
+      "output_tok_s": 61.582,
+      "tpot_ms": 15.427
+    }
+  },
+  {
+    "mode": "tp",
+    "case": "short",
+    "prompt": "请介绍一下什么是大语言模型，并说明它的用途。",
+    "argv": [
+      "/home/hzy/project/QWECPP/build/bin/qwecpp_chat",
+      "--model",
+      "/home/hzy/models/Qwen/Qwen3-0.6B",
+      "--max-new-tokens",
+      "32",
+      "--debug",
+      "--devices",
+      "0,1",
+      "--parallel",
+      "tp"
+    ],
+    "warmup": {
+      "turn": 1.0,
+      "input_tokens": 23.0,
+      "output_tokens": 32.0,
+      "ttft_ms": 97.581,
+      "first_text_ms": 97.59,
+      "total_ms": 316.08,
+      "output_tok_s": 101.24,
+      "tpot_ms": 7.048
+    },
+    "runs": [
+      {
+        "turn": 2.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 6.629,
+        "first_text_ms": 6.631,
+        "total_ms": 224.123,
+        "output_tok_s": 142.779,
+        "tpot_ms": 7.016
+      },
+      {
+        "turn": 3.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 6.516,
+        "first_text_ms": 6.519,
+        "total_ms": 233.983,
+        "output_tok_s": 136.762,
+        "tpot_ms": 7.337
+      },
+      {
+        "turn": 4.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 6.52,
+        "first_text_ms": 6.523,
+        "total_ms": 223.832,
+        "output_tok_s": 142.964,
+        "tpot_ms": 7.01
+      },
+      {
+        "turn": 5.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 6.538,
+        "first_text_ms": 6.54,
+        "total_ms": 232.474,
+        "output_tok_s": 137.65,
+        "tpot_ms": 7.288
+      },
+      {
+        "turn": 6.0,
+        "input_tokens": 23.0,
+        "output_tokens": 32.0,
+        "ttft_ms": 6.526,
+        "first_text_ms": 6.528,
+        "total_ms": 223.865,
+        "output_tok_s": 142.943,
+        "tpot_ms": 7.011
+      }
+    ],
+    "median": {
+      "input_tokens": 23.0,
+      "output_tokens": 32.0,
+      "ttft_ms": 6.526,
+      "first_text_ms": 6.528,
+      "total_ms": 224.123,
+      "output_tok_s": 142.779,
+      "tpot_ms": 7.016
+    }
+  },
+  {
+    "mode": "tp",
+    "case": "long",
+    "prompt": "背景资料：大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。大语言模型可以用于文本生成、问答和代码辅助。 请简要总结上述资料。",
+    "argv": [
+      "/home/hzy/project/QWECPP/build/bin/qwecpp_chat",
+      "--model",
+      "/home/hzy/models/Qwen/Qwen3-0.6B",
+      "--max-new-tokens",
+      "32",
+      "--debug",
+      "--devices",
+      "0,1",
+      "--parallel",
+      "tp"
+    ],
+    "warmup": {
+      "turn": 1.0,
+      "input_tokens": 179.0,
+      "output_tokens": 19.0,
+      "ttft_ms": 103.612,
+      "first_text_ms": 103.623,
+      "total_ms": 369.921,
+      "output_tok_s": 51.362,
+      "tpot_ms": 13.976
+    },
+    "runs": [
+      {
+        "turn": 2.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.947,
+        "first_text_ms": 13.951,
+        "total_ms": 292.888,
+        "output_tok_s": 64.871,
+        "tpot_ms": 14.681
+      },
+      {
+        "turn": 3.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.913,
+        "first_text_ms": 13.916,
+        "total_ms": 279.787,
+        "output_tok_s": 67.909,
+        "tpot_ms": 13.953
+      },
+      {
+        "turn": 4.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.823,
+        "first_text_ms": 13.827,
+        "total_ms": 298.147,
+        "output_tok_s": 63.727,
+        "tpot_ms": 14.981
+      },
+      {
+        "turn": 5.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.836,
+        "first_text_ms": 13.84,
+        "total_ms": 279.863,
+        "output_tok_s": 67.89,
+        "tpot_ms": 13.964
+      },
+      {
+        "turn": 6.0,
+        "input_tokens": 179.0,
+        "output_tokens": 19.0,
+        "ttft_ms": 13.862,
+        "first_text_ms": 13.865,
+        "total_ms": 290.482,
+        "output_tok_s": 65.409,
+        "tpot_ms": 14.551
+      }
+    ],
+    "median": {
+      "input_tokens": 179.0,
+      "output_tokens": 19.0,
+      "ttft_ms": 13.862,
+      "first_text_ms": 13.865,
+      "total_ms": 290.482,
+      "output_tok_s": 65.409,
+      "tpot_ms": 14.551
+    }
+  }
+]

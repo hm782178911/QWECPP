@@ -1,2 +1,6 @@
 
 /build/
+
+# Python verification caches
+__pycache__/
+*.py[cod]
