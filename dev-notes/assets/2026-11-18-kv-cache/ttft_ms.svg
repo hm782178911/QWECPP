@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="660" viewBox="0 0 1100 660" role="img">
+<title>Time to first token: KV cache off versus on</title>
+<rect width="1100" height="660" fill="#f8fafc"/>
+<g font-family="Arial, sans-serif" fill="#0f172a">
+<text x="32" y="40" font-size="25" font-weight="bold">KV Cache | Time to first token</text>
+<text x="32" y="66" font-size="14" fill="#475569">Lower is better · Median of 3 measured runs after 1 warmup · FP32 · 32 output tokens</text>
+<rect x="760" y="87" width="16" height="16" fill="#64748b"/>
+<text x="783" y="100" font-size="14">Cache OFF</text>
+<rect x="910" y="87" width="16" height="16" fill="#0d9488"/>
+<text x="933" y="100" font-size="14">Cache ON</text>
+<line x1="245.0" y1="120" x2="245.0" y2="570" stroke="#e2e8f0"/>
+<text x="245.0" y="592" text-anchor="middle" font-size="12">0.0</text>
+<line x1="420.0" y1="120" x2="420.0" y2="570" stroke="#e2e8f0"/>
+<text x="420.0" y="592" text-anchor="middle" font-size="12">31.1</text>
+<line x1="595.0" y1="120" x2="595.0" y2="570" stroke="#e2e8f0"/>
+<text x="595.0" y="592" text-anchor="middle" font-size="12">62.3</text>
+<line x1="770.0" y1="120" x2="770.0" y2="570" stroke="#e2e8f0"/>
+<text x="770.0" y="592" text-anchor="middle" font-size="12">93.4</text>
+<line x1="945.0" y1="120" x2="945.0" y2="570" stroke="#e2e8f0"/>
+<text x="945.0" y="592" text-anchor="middle" font-size="12">124.6</text>
+<text x="230" y="150" text-anchor="end" font-size="13">Qwen3-0.6B / SINGLE / 20 tokens</text>
+<rect x="245" y="135" width="24.48" height="15" rx="3" fill="#64748b"/>
+<text x="275.48" y="147" font-size="12">4.36</text>
+<rect x="245" y="154" width="24.67" height="15" rx="3" fill="#0d9488"/>
+<text x="275.67" y="166" font-size="12">4.39</text>
+<text x="230" y="205" text-anchor="end" font-size="13">Qwen3-0.6B / SINGLE / 178 tokens</text>
+<rect x="245" y="190" width="77.09" height="15" rx="3" fill="#64748b"/>
+<text x="328.09" y="202" font-size="12">13.72</text>
+<rect x="245" y="209" width="77.33" height="15" rx="3" fill="#0d9488"/>
+<text x="328.33" y="221" font-size="12">13.76</text>
+<text x="230" y="260" text-anchor="end" font-size="13">Qwen3-0.6B / TP / 20 tokens</text>
+<rect x="245" y="245" width="36.55" height="15" rx="3" fill="#64748b"/>
+<text x="287.55" y="257" font-size="12">6.50</text>
+<rect x="245" y="264" width="37.41" height="15" rx="3" fill="#0d9488"/>
+<text x="288.41" y="276" font-size="12">6.66</text>
+<text x="230" y="315" text-anchor="end" font-size="13">Qwen3-0.6B / TP / 178 tokens</text>
+<rect x="245" y="300" width="79.14" height="15" rx="3" fill="#64748b"/>
+<text x="330.14" y="312" font-size="12">14.09</text>
+<rect x="245" y="319" width="81.14" height="15" rx="3" fill="#0d9488"/>
+<text x="332.14" y="331" font-size="12">14.44</text>
+<text x="230" y="370" text-anchor="end" font-size="13">Qwen3-8B / SINGLE / 20 tokens</text>
+<rect x="245" y="355" width="195.57" height="15" rx="3" fill="#64748b"/>
+<text x="446.57" y="367" font-size="12">34.81</text>
+<rect x="245" y="374" width="193.58" height="15" rx="3" fill="#0d9488"/>
+<text x="444.58" y="386" font-size="12">34.46</text>
+<text x="230" y="425" text-anchor="end" font-size="13">Qwen3-8B / SINGLE / 178 tokens</text>
+<rect x="245" y="410" width="583.33" height="15" rx="3" fill="#64748b"/>
+<text x="834.33" y="422" font-size="12">103.83</text>
+<rect x="245" y="429" width="555.10" height="15" rx="3" fill="#0d9488"/>
+<text x="806.10" y="441" font-size="12">98.80</text>
+<text x="230" y="480" text-anchor="end" font-size="13">Qwen3-8B / TP / 20 tokens</text>
+<rect x="245" y="465" width="130.13" height="15" rx="3" fill="#64748b"/>
+<text x="381.13" y="477" font-size="12">23.16</text>
+<rect x="245" y="484" width="131.92" height="15" rx="3" fill="#0d9488"/>
+<text x="382.92" y="496" font-size="12">23.48</text>
+<text x="230" y="535" text-anchor="end" font-size="13">Qwen3-8B / TP / 178 tokens</text>
+<rect x="245" y="520" width="361.16" height="15" rx="3" fill="#64748b"/>
+<text x="612.16" y="532" font-size="12">64.28</text>
+<rect x="245" y="539" width="363.35" height="15" rx="3" fill="#0d9488"/>
+<text x="614.35" y="551" font-size="12">64.67</text>
+<text x="595.0" y="616" text-anchor="middle" font-size="13">ms</text>
+<text x="32" y="645" font-size="12" fill="#64748b">max-context=512 · debug enabled in both modes · per-turn prefill · no clock locking / GPU isolation</text>
+</g></svg>
