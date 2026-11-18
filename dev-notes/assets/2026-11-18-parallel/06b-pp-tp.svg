@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" role="img">
+<title>Qwen3-0.6B | Single vs PP vs TP | Cache OFF</title>
+<rect width="1000" height="640" fill="#f8fafc"/>
+<g font-family="Arial,sans-serif" fill="#0f172a">
+<text x="28" y="38" font-size="24" font-weight="bold">Qwen3-0.6B | Single vs PP vs TP | Cache OFF</text>
+<text x="28" y="65" font-size="14">TPOT (ms) - lower is better; ratio = single-GPU TPOT / mode TPOT</text>
+<text x="290" y="119" text-anchor="end" font-size="14">short / SINGLE</text>
+<rect x="305" y="100" width="142.07" height="28" rx="4" fill="#64748b"/>
+<text x="454.07" y="120" font-size="13">4.708</text>
+<text x="925" y="120" text-anchor="middle" font-size="16">1.00x</text>
+<text x="290" y="179" text-anchor="end" font-size="14">short / PP</text>
+<rect x="305" y="160" width="148.43" height="28" rx="4" fill="#d97706"/>
+<text x="460.43" y="180" font-size="13">4.919</text>
+<text x="925" y="180" text-anchor="middle" font-size="16">0.96x</text>
+<text x="290" y="239" text-anchor="end" font-size="14">short / TP</text>
+<rect x="305" y="220" width="211.71" height="28" rx="4" fill="#0d9488"/>
+<text x="523.71" y="240" font-size="13">7.016</text>
+<text x="925" y="240" text-anchor="middle" font-size="16">0.67x</text>
+<text x="290" y="299" text-anchor="end" font-size="14">long / SINGLE</text>
+<rect x="305" y="280" width="454.41" height="28" rx="4" fill="#64748b"/>
+<text x="766.41" y="300" font-size="13">15.059</text>
+<text x="925" y="300" text-anchor="middle" font-size="16">1.00x</text>
+<text x="290" y="359" text-anchor="end" font-size="14">long / PP</text>
+<rect x="305" y="340" width="465.52" height="28" rx="4" fill="#d97706"/>
+<text x="777.52" y="360" font-size="13">15.427</text>
+<text x="925" y="360" text-anchor="middle" font-size="16">0.98x</text>
+<text x="290" y="419" text-anchor="end" font-size="14">long / TP</text>
+<rect x="305" y="400" width="439.08" height="28" rx="4" fill="#0d9488"/>
+<text x="751.08" y="420" font-size="13">14.551</text>
+<text x="925" y="420" text-anchor="middle" font-size="16">1.03x</text>
+<text x="28" y="610" font-size="13">Ratios below 1 mean regression. No clock locking / GPU isolation.</text>
+</g></svg>

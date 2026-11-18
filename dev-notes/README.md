@@ -6,3 +6,5 @@
 - [2026-11-17：TP、诊断、8B 与长上下文](2026-11-17-tp-and-runtime.md)
 
 - [2026-11-18：可选 KV Cache](2026-11-18-kv-cache.md)
+
+- [2026-11-18：PP / TP 性能对比](2026-11-18-parallel-performance.md)
