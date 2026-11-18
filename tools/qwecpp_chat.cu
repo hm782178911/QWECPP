@@ -90,13 +90,14 @@ int main(int argc, char **argv) {
         std::string directory;
         int max_new = 128;
         bool debug = false;
+        bool pd_grouped = false;
         bool sliding_window = false;
         using Clock = std::chrono::steady_clock;
         struct Metrics {
             size_t input_tokens;
             int output_tokens;
             double ttft, first_text, total, tpot;
-            qwe::TransferStats comm;
+            qwe::TransferStats comm, kv;
             double prefill_ms,decode_ms;
             size_t cache_bytes;
             size_t dropped_turns;
@@ -109,7 +110,7 @@ int main(int argc, char **argv) {
             std::string key = argv[i];
             if (key == "--help") {
                 std::cout << "Usage: qwecpp_chat --model DIR [--max-new-tokens 128] [--devices "
-                             "0,1] [--max-context 2048] [--parallel pp|tp] [--split-layer 14] [--pp-host-transfer] [--kv-cache] [--debug] [--sliding-window]\n";
+                             "0,1] [--max-context 2048] [--parallel pp|tp|pd|pd-pp|pd-tp] [--split-layer 14] [--pp-host-transfer] [--kv-cache] [--debug] [--sliding-window]\n";
                 return 0;
             }
             if(key=="--kv-cache") { options.kv_cache=true; continue; }
@@ -135,10 +136,13 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("max-context must be 1..8192");
             } else if (key == "--parallel") {
                 std::string mode = argv[++i];
-                if (mode != "tp" && mode != "pp") throw std::runtime_error("parallel must be tp or pp");
-                options.tensor_parallel = mode == "tp";
+                if (mode != "tp" && mode != "pp" && mode != "pd" && mode != "pd-pp" && mode != "pd-tp")
+                    throw std::runtime_error("parallel must be pp, tp, pd, pd-pp or pd-tp");
+                options.prefill_decode = mode == "pd" || mode == "pd-pp" || mode == "pd-tp";
+                options.tensor_parallel = mode == "tp" || mode == "pd-tp";
+                pd_grouped = mode == "pd-pp" || mode == "pd-tp";
             } else if (key == "--devices")
-                options.devices = qwe::parse_devices(argv[++i]);
+                options.devices = qwe::parse_devices(argv[++i], 4);
             else if (key == "--split-layer") {
                 std::string value = argv[++i];
                 size_t used;
@@ -158,6 +162,11 @@ int main(int argc, char **argv) {
         }
         if (directory.empty())
             throw std::runtime_error("--model required");
+        if (options.prefill_decode) {
+            if (options.devices.size() != (pd_grouped ? 4 : 2))
+                throw std::runtime_error("PD requires two devices; pd-pp/pd-tp require four");
+            options.kv_cache = true;
+        }
         auto load_start = Clock::now();
         qwe::Tokenizer tokenizer(directory);
         if (tokenizer.encode("<|im_start|>") != std::vector<int>{151644} ||
@@ -217,18 +226,23 @@ int main(int argc, char **argv) {
             bool stopped = false;
             double prefill_ms=0,decode_ms=0;
             int generated = 0;
-            qwe::TransferStats comm;
+            qwe::TransferStats comm, kv;
             size_t input_tokens = ids.size();
             double ttft = -1, first_text = -1;
             Clock::time_point first_token, last_token;
             for (; generated < max_new && ids.size() < (size_t)model.context_limit(); ++generated) {
-                // 无 KV Cache：每步重算上下文，只取最后位置的 logits 做贪心选择。
+                // 只取最后位置的 logits 做贪心选择。
                 auto forward_start=Clock::now();
                 auto logits = model.forward(ids, true);
                 double elapsed=ms(forward_start,Clock::now());
                 if(generated==0) prefill_ms+=elapsed; else decode_ms+=elapsed;
                 if(debug) {
                     auto step=model.last_transfer_stats();
+                    auto handoff = model.last_kv_transfer_stats();
+                    if (handoff.calls) {
+                        kv = handoff;
+                        decode_ms -= handoff.total_ms;
+                    }
                     comm.calls+=step.calls; comm.bytes+=step.bytes;
                     comm.p2p_calls+=step.p2p_calls; comm.host_calls+=step.host_calls;
                     comm.total_ms+=step.total_ms; comm.source_wait_ms+=step.source_wait_ms;
@@ -260,7 +274,7 @@ int main(int argc, char **argv) {
             if (debug)
                 metrics.push_back({input_tokens, generated, ttft, first_text,
                     ms(request_start, Clock::now()),
-                    generated > 1 ? ms(first_token, last_token)/(generated-1) : -1, comm, prefill_ms, decode_ms, model.kv_cache_bytes(), dropped_turns});
+                    generated > 1 ? ms(first_token, last_token)/(generated-1) : -1, comm, kv, prefill_ms, decode_ms, model.kv_cache_bytes(), dropped_turns});
             next.push_back({"assistant", reply});
             history = std::move(next);
             if (!stopped) {
@@ -295,8 +309,14 @@ int main(int argc, char **argv) {
                     << " tp_transfer_ms=" << m.comm.total_ms
                     << " tp_source_wait_ms=" << m.comm.source_wait_ms
                     << " tp_transfer_rest_ms=" << m.comm.total_ms-m.comm.source_wait_ms
-                    << " tp_transfer_pct=" << (m.total>0 ? m.comm.total_ms*100/m.total : 0)
-                    << "\n";
+                    << " tp_transfer_pct=" << (m.total>0 ? m.comm.total_ms*100/m.total : 0);
+                if (options.prefill_decode)
+                    std::cerr << " kv_transfer_calls=" << m.kv.calls
+                              << " kv_transfer_bytes=" << m.kv.bytes
+                              << " kv_p2p_calls=" << m.kv.p2p_calls
+                              << " kv_host_calls=" << m.kv.host_calls
+                              << " kv_transfer_ms=" << m.kv.total_ms;
+                std::cerr << "\n";
             }
         }
         return 0;

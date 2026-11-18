@@ -5,6 +5,55 @@
 int main(int argc,char **argv) {
  try {
     if(argc<2) throw std::runtime_error("model directory required");
+    if (argc > 2 && (std::string(argv[2]) == "pd" || std::string(argv[2]) == "pd-host" ||
+                     std::string(argv[2]) == "pd-pp" || std::string(argv[2]) == "pd-tp")) {
+        qwe::Qwen3Options options;
+        options.max_context = 64;
+        options.kv_cache = true;
+        std::string mode = argv[2];
+        bool grouped = mode == "pd-pp" || mode == "pd-tp";
+        options.tensor_parallel = mode == "pd-tp";
+        options.devices = grouped ? std::vector<int>{0, 1} : std::vector<int>{0};
+        qwe::Qwen3 baseline(argv[1], options);
+        options.devices = grouped ? std::vector<int>{0, 1, 2, 3} : std::vector<int>{0, 1};
+        options.prefill_decode = true;
+        options.profile = true;
+        options.force_host_transfer = std::string(argv[2]) == "pd-host";
+        qwe::Qwen3 pd(argv[1], options);
+        auto compare = [&](const std::vector<int> &ids, bool handoff) {
+            auto a = baseline.forward(ids, true), b = pd.forward(ids, true);
+            if (a.size() != b.size() ||
+                std::max_element(a.begin(), a.end()) - a.begin() !=
+                std::max_element(b.begin(), b.end()) - b.begin())
+                throw std::runtime_error("PD logits shape or argmax mismatch");
+            double mean = 0;
+            float max_error = 0;
+            for (size_t i = 0; i < a.size(); ++i) {
+                float error = std::fabs(a.data()[i] - b.data()[i]);
+                if (!std::isfinite(error) || error > 0.002f + 0.0001f * std::fabs(a.data()[i]))
+                    throw std::runtime_error("PD logits mismatch");
+                max_error = std::max(max_error, error);
+                mean += error;
+            }
+            auto stats = pd.last_kv_transfer_stats();
+            if ((stats.calls > 0) != handoff ||
+                (options.force_host_transfer && stats.host_calls != stats.calls))
+                throw std::runtime_error("unexpected PD handoff");
+            std::cout << "length=" << ids.size() << " max_abs=" << max_error
+                      << " mean_abs=" << mean / a.size() << " bytes=" << stats.bytes
+                      << " p2p=" << stats.p2p_calls << " host=" << stats.host_calls << "\n";
+        };
+        compare({9707, 11}, false);
+        compare({9707, 11, 1879}, true);
+        compare({9707, 11, 1879, 42}, false);
+        compare({11, 9707}, false);
+        compare({11, 9707, 42, 43}, true);
+        pd.reset_cache();
+        baseline.reset_cache();
+        compare({42}, false);
+        compare({42, 11}, true);
+        return 0;
+    }
     qwe::Qwen3Options options; options.max_context=argc>3 ? std::stoi(argv[3]) : 64;
     if(argc>2 && std::string(argv[2])!="single") options.devices={0,1};
     if(argc>2 && std::string(argv[2])=="tp") options.tensor_parallel=true;

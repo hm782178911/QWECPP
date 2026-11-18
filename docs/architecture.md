@@ -25,3 +25,10 @@ WeightArchive 按索引选择并延迟 mmap 分片，保留单文件兼容；Wei
 ## KV Cache（2026-11-18）
 
 KVCache 在 backend/cuda 持有每层 FP32 K/V；Stage 负责追加并调用缓存 Attention，公共算子校验后缀与完整前缀形状。Qwen3 用精确 token 前缀判定复用，否则重建；每轮聊天 reset 逻辑长度，显存容量保留。TP 只存本卡 KV heads，PP 只存本阶段层。RoPE 接收绝对位置 offset，缓存保存归一化/旋转后的 K。关闭开关和完整 logits 输出保持原计算路径。
+
+
+## 同机双卡 Prefill / Decode
+
+PD 在同一 `Qwen3` 实例中建立两组 Stage，第一组执行 Prefill 并产生首 token。第一次增量前向通过公共 CUDA transfer 逐层传输有效 FP32 K/V，形状为 `[prefix_length, kvheads, head_dim]`。两组分别拥有缓存，按上下文容量分配。目的端完成全部交接后才执行后缀计算，后续增量前向留在 Decode 组。reset、非追加输入和前向执行异常使逻辑前缀失效，分配保留供复用。完整位置前向在 Prefill 组计算，并使缓存失效。
+
+四卡 PD 的两组使用同一并行布局。PP 按层区间、TP 按 KV head 分片交接；每个 Prefill rank 只向对应的 Decode rank 复制。TP 组内通信与 KV 交接各自记录统计。

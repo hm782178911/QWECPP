@@ -382,6 +382,10 @@ struct Qwen3::Impl {
     bool kv_enabled = false;
     std::vector<int> cached_tokens;
     bool tp = false;
+    bool pd = false;
+    bool decode_ready = false;
+    size_t group_size = 1;
+    TransferStats kv_transfer_stats;
     bool profile = false;
     TransferStats transfer_stats;
     std::vector<std::unique_ptr<Stage>> stages;
@@ -404,34 +408,36 @@ struct Qwen3::Impl {
         }
         int count;
         check(cudaGetDeviceCount(&count));
-        if (devices.size() > 2 || (devices.size() == 2 && devices[0] == devices[1]))
-            throw std::runtime_error("expected one or two distinct CUDA devices");
+        pd = options.prefill_decode;
+        tp = options.tensor_parallel;
+        auto sorted = devices;
+        std::sort(sorted.begin(), sorted.end());
+        if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end())
+            throw std::runtime_error("CUDA devices must be distinct");
         for (int id : devices)
             if (id < 0 || id >= count)
                 throw std::runtime_error("CUDA device index out of range");
         kv_enabled = options.kv_cache;
         profile = options.profile;
-        tp = options.tensor_parallel;
-        if (tp) {
-            if (devices.size()!=2 || options.split_layer!=-1)
-                throw std::runtime_error("TP requires two GPUs and no split-layer");
-            if (c.heads%2 || c.kvheads%2 || c.intermediate%2)
-                throw std::runtime_error("TP requires heads, KV heads and intermediate divisible by two");
-            for(int rank=0;rank<2;++rank)
-                stages.push_back(std::make_unique<Stage>(directory,c,devices[rank],0,c.layers,options.force_host_transfer,rank));
-        } else if (devices.size() == 1) {
-            if (options.split_layer != -1)
-                throw std::runtime_error("split-layer requires two GPUs");
+        if (pd && (!kv_enabled || (devices.size() != 2 && devices.size() != 4)))
+            throw std::runtime_error("PD requires two or four GPUs and KV cache");
+        group_size = devices.size() / (pd ? 2 : 1);
+        if (group_size > 2 || (tp && (group_size != 2 || options.split_layer != -1)))
+            throw std::runtime_error("TP requires two GPUs per group and no split-layer");
+        if (tp && (c.heads % 2 || c.kvheads % 2 || c.intermediate % 2))
+            throw std::runtime_error("TP requires heads, KV heads and intermediate divisible by two");
+        if (group_size == 1 && options.split_layer != -1)
+            throw std::runtime_error("split-layer requires two GPUs per PP group");
+        int split = options.split_layer == -1 ? c.layers / 2 : options.split_layer;
+        if (!tp && group_size == 2 && (split < 1 || split >= c.layers))
+            throw std::runtime_error("split-layer must be inside model layer range");
+        for (size_t i = 0; i < devices.size(); ++i) {
+            int rank = static_cast<int>(i % group_size);
+            bool pp = group_size == 2 && !tp;
+            int begin = pp && rank == 1 ? split : 0;
+            int end = pp && rank == 0 ? split : c.layers;
             stages.push_back(std::make_unique<Stage>(
-                directory, c, devices[0], 0, c.layers, options.force_host_transfer));
-        } else {
-            int split = options.split_layer == -1 ? c.layers / 2 : options.split_layer;
-            if (split < 1 || split >= c.layers)
-                throw std::runtime_error("split-layer must be inside model layer range");
-            stages.push_back(std::make_unique<Stage>(
-                directory, c, devices[0], 0, split, options.force_host_transfer));
-            stages.push_back(std::make_unique<Stage>(
-                directory, c, devices[1], split, c.layers, options.force_host_transfer));
+                directory, c, devices[i], begin, end, options.force_host_transfer, tp ? rank : -1));
         }
     }
     /**
@@ -442,7 +448,7 @@ struct Qwen3::Impl {
      * @note 没有 KV Cache；单请求不产生流水线重叠。
      */
 
-    HostTensor run_tp(const std::vector<int> &tokens, bool last_only, int offset=0, int capacity=0) {
+    HostTensor run_tp(const std::vector<int> &tokens, bool last_only, int offset, int capacity, size_t first) {
         int n=(int)tokens.size();
         struct Work {
             DeviceTensor x,normed,q,k,v,attn,projected,gate,up,other;
@@ -454,15 +460,15 @@ struct Qwen3::Impl {
         };
         std::unique_ptr<Work> w[2];
         for(int rank=0;rank<2;++rank) {
-            DeviceGuard guard(stages[rank]->device);
+            DeviceGuard guard(stages[first + rank]->device);
             w[rank]=std::make_unique<Work>(n,c);
             DeviceTensor ids(DTYPE_INT32,{n});
             check(cudaMemcpy(ids.tensor.data,tokens.data(),ids.tensor.nbytes,cudaMemcpyHostToDevice));
-            embedding(w[rank]->x.tensor,*stages[rank]->emb,ids.tensor);
+            embedding(w[rank]->x.tensor,*stages[first + rank]->emb,ids.tensor);
         }
         for(int layer=0;layer<c.layers;++layer) for(int phase=0;phase<2;++phase) {
             for(int rank=0;rank<2;++rank) {
-                auto &stage=*stages[rank]; DeviceGuard guard(stage.device);
+                auto &stage=*stages[first + rank]; DeviceGuard guard(stage.device);
                 auto &x=w[rank]->x; auto &normed=w[rank]->normed;
                 auto &q=w[rank]->q; auto &k=w[rank]->k; auto &v=w[rank]->v;
                 auto &attn=w[rank]->attn; auto &projected=w[rank]->projected;
@@ -495,14 +501,39 @@ struct Qwen3::Impl {
             }
             // Both partial outputs remain intact until each rank has received its peer.
             for(int rank=0;rank<2;++rank)
-                transfer(w[rank]->other.tensor,w[1-rank]->projected.tensor,stages[rank]->force_host,profile ? &transfer_stats : nullptr);
+                transfer(w[rank]->other.tensor,w[1-rank]->projected.tensor,stages[first + rank]->force_host,profile ? &transfer_stats : nullptr);
             for(int rank=0;rank<2;++rank) {
-                DeviceGuard guard(stages[rank]->device);
+                DeviceGuard guard(stages[first + rank]->device);
                 add(w[rank]->projected.tensor,w[rank]->other.tensor);
                 add(w[rank]->x.tensor,w[rank]->projected.tensor);
             }
         }
-        return stages[0]->project(w[0]->x,last_only);
+        return stages[first]->project(w[0]->x,last_only);
+    }
+
+    /**
+     * @brief 将 Prefill 卡各层有效的 FP32 K/V [length, kvheads, dim] 交接给 Decode 卡。
+     * @note 目标卡拥有独立缓存，容量为 context。复制失败由 forward 使逻辑前缀失效。
+     */
+    void handoff_cache(int length) {
+        auto *stats = profile ? &kv_transfer_stats : nullptr;
+        for (size_t rank = 0; rank < group_size; ++rank) {
+            const auto &source = *stages[rank];
+            auto &target = *stages[group_size + rank];
+            DeviceGuard guard(target.device);
+            target.cache.resize(target.layers.size());
+            for (size_t layer = 0; layer < source.layers.size(); ++layer) {
+                auto keys_in = source.cache[layer]->key_view(length);
+                auto values_in = source.cache[layer]->value_view(length);
+                auto &destination = target.cache[layer];
+                if (!destination)
+                    destination = std::make_unique<KVCache>(context, c.kvheads / (tp ? 2 : 1), c.dim);
+                auto keys_out = destination->key_view(length);
+                auto values_out = destination->value_view(length);
+                transfer(keys_out, keys_in, target.force_host, stats);
+                transfer(values_out, values_in, target.force_host, stats);
+            }
+        }
     }
 
     HostTensor forward(const std::vector<int> &tokens, bool last_only) {
@@ -512,20 +543,36 @@ struct Qwen3::Impl {
             if (id < 0 || id >= c.vocab)
                 throw std::runtime_error("token ID outside vocabulary");
         transfer_stats = {};
+        kv_transfer_stats = {};
         int offset=0,capacity=kv_enabled && last_only ? context : 0;
         if(capacity && tokens.size()>cached_tokens.size() &&
            std::equal(cached_tokens.begin(),cached_tokens.end(),tokens.begin())) offset=(int)cached_tokens.size();
         std::vector<int> suffix(tokens.begin()+offset,tokens.end());
         try {
             HostTensor result = [&]() {
-                if(tp) return run_tp(suffix,last_only,offset,capacity);
+                if (pd) {
+                    if (offset == 0) {
+                        decode_ready = false;
+                    } else if (!decode_ready) {
+                        handoff_cache(offset);
+                        decode_ready = true;
+                    }
+                }
+                size_t first = pd && decode_ready ? group_size : 0;
+                if (tp)
+                    return run_tp(suffix, last_only, offset, capacity, first);
                 std::unique_ptr<DeviceTensor> hidden;
-                for(auto &stage:stages) hidden=stage->run(suffix,hidden.get(),offset,capacity);
-                return stages.back()->project(*hidden,last_only);
+                for (size_t i = first; i < first + group_size; ++i)
+                    hidden = stages[i]->run(suffix, hidden.get(), offset, capacity);
+                return stages[first + group_size - 1]->project(*hidden, last_only);
             }();
             cached_tokens=capacity ? tokens : std::vector<int>{};
             return result;
-        } catch(...) { cached_tokens.clear(); throw; }
+        } catch (...) {
+            cached_tokens.clear();
+            decode_ready = false;
+            throw;
+        }
     }
 };
 
@@ -546,8 +593,12 @@ Qwen3::~Qwen3() = default;
  * @brief 查询当前实现支持的最大输入长度。
  * @return 配置的有效上下文上限，单位为 token。
  */
-void Qwen3::reset_cache() { impl->cached_tokens.clear(); }
+void Qwen3::reset_cache() {
+    impl->cached_tokens.clear();
+    impl->decode_ready = false;
+}
 size_t Qwen3::kv_cache_bytes() const { size_t bytes=0; for(auto &stage:impl->stages) bytes+=stage->cache_bytes(); return bytes; }
+TransferStats Qwen3::last_kv_transfer_stats() const { return impl->kv_transfer_stats; }
 TransferStats Qwen3::last_transfer_stats() const { return impl->transfer_stats; }
 int Qwen3::context_limit() const {
     return impl->context;

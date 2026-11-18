@@ -28,7 +28,7 @@ QWECPP 是一个以 C / CUDA 为核心的 LLM 推理引擎。从 Qwen3-0.6B 出�
 | 模型 | Qwen3-0.6B、Qwen3-8B，batch = 1 |
 | GPU 算子 | Embedding、RMSNorm、RoPE、因果 GQA、SwiGLU、残差、Linear |
 | 原生聊天 | Tokenizer、多轮历史、流式 UTF-8 输出、贪心解码 |
-| 多 GPU | 两卡 PP 按层执行、两卡 TP 按 head / MLP 通道切分 |
+| 多 GPU | 两卡 PP 按层执行、两卡 TP 按 head / MLP 通道切分、同机两卡 PD |
 | 上下文 | 默认 **2048 token**，`--max-context` 可配置至 **8192** |
 | KV Cache | 可选 `--kv-cache`，单卡 / PP / TP；默认关闭 |
 | 历史管理 | 可选滑动窗口，默认关闭 |
@@ -119,6 +119,19 @@ cmake --build build -j8
 --debug 附带 kv_cache（开关）、kv_cache_bytes（所有 GPU 上已分配缓存总字节，不含权重/工作区）、prefill_ms（本轮首次模型调用墙钟时间）、decode_ms（后续调用累计时间，含终止 EOS 检查）。关闭缓存时后续调用仍是完整重算，decode_ms 只表示生成阶段计时。首次缓存分配开销计入 prefill；对比应预热并使用相同开关之外的参数。
 
 数值测试：`build/bin/test_kv_cache MODEL_DIR [single|pp|tp] [测试上下文上限]`；聊天对照：`python3 tests/models/test_kv_chat.py`。详见 [KV Cache 开发记录](dev-notes/2026-11-18-kv-cache.md)。
+
+### 同机双卡 PD
+
+```bash
+./build/bin/qwecpp_chat --model /home/hzy/models/Qwen/Qwen3-0.6B \
+  --parallel pd --devices 0,1 --debug
+```
+
+设备顺序为 Prefill、Decode。PD 自动启用 KV Cache，两卡各加载一份完整权重，每轮首次增量前向前交接有效 K/V。可用 `--pp-host-transfer` 强制固定页主机中转。PD 要求两张不同的 GPU，不能指定 `--split-layer`。
+
+四卡可用 `--parallel pd-pp --devices 4,5,6,7` 或 `--parallel pd-tp --devices 4,5,6,7`。前两张用于 Prefill，后两张用于 Decode。PP 两侧共用切层边界，可用 `--split-layer` 指定；TP 两侧按相同的 rank 切分。两侧须使用相同布局，按 rank 交接缓存分片。组内通信和 KV 交接都复用 P2P 校验及主机中转。当前为同一进程内的串行单请求执行。
+
+`--debug` 中 `kv_transfer_ms` 为传输调用累计墙钟时间，含同步、路由和首次校验，`kv_transfer_bytes` 为逻辑 K/V 字节数。PD 的 `decode_ms` 扣除传输调用时间，仍含首次接收缓存分配。首 token 计时在交接之前，TPOT 包含首个 token 间隔内的交接。
 
 ## 4. Project Structure
 

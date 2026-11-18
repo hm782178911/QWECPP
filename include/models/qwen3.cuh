@@ -13,7 +13,8 @@ struct Qwen3Options {
     bool profile = false; // 启用通信诊断计时。
     bool tensor_parallel = false;    // 两卡张量并行；不与 split_layer 混用。
     int split_layer = -1;             // 第二阶段的起始层，-1 表示均分；仅两卡有效。
-    bool force_host_transfer = false; // 强制通过固定页主机内存中转隐藏状态。
+    bool force_host_transfer = false; // 强制通过固定页主机内存中转。
+    bool prefill_decode = false; // 前后两组设备分别执行 Prefill 和 Decode，要求启用 KV Cache。
 };
 class Qwen3 {
     struct Impl;
@@ -41,6 +42,7 @@ class Qwen3 {
      * @param[in] last_only true 只投影最后位置；false 返回所有输入位置。
      * @return 拥有 CPU 内存的 HostTensor；FP32 行优先，形状为 [last_only?1:n, vocab]。
      * @note 不修改 tokens；默认重算完整序列；kv_cache 开启且 last_only=true 时复用精确前缀，仅处理新增后缀。
+     * @note PD 模式下首次前向在首卡执行，首次增量前向交接有效 K/V 后由次卡续算。
      * @note GPU 计算完成后复制结果到 CPU；返回对象销毁时自动释放其 CPU 内存。
      */
     HostTensor forward(const std::vector<int> &tokens, bool last_only = false);
@@ -51,6 +53,8 @@ class Qwen3 {
      */
     int context_limit() const;
     TransferStats last_transfer_stats() const;
+    // 最近一次前向的 PD 缓存交接统计（需启用 profile）。
+    TransferStats last_kv_transfer_stats() const;
     // 使前缀失效，下一次重新 prefill；保留已分配容量供复用。
     void reset_cache();
     size_t kv_cache_bytes() const;
