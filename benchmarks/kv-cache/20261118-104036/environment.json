@@ -1,0 +1,7 @@
+{
+  "utc": "2026-11-18T02:41:48Z",
+  "base_commit": "a28e5846419fc9efddd3954a4067d9a96ef56b33",
+  "binary_sha256": "d70569a0bdaf473879dcd1c98556cb109ee1e8004a7a3b42111682086db7cd08",
+  "gpu": "index, name, driver_version\n0, NVIDIA RTX PRO 6000 Blackwell Max-Q Workstation Edition, 595.99.02\n1, NVIDIA RTX PRO 6000 Blackwell Max-Q Workstation Edition, 595.99.02\n",
+  "method": "same binary; debug on both; max-context 512; max-new 32; each case 1 warmup then 3 runs; per-turn reset; not clock-locked or GPU-isolated"
+}

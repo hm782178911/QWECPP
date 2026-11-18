@@ -120,11 +120,12 @@ void norm(Tensor &out, const Tensor &in, const Tensor &w, float eps) {
  * @return 无返回值；结果通过输出参数写入。
  * @note 返回后 x 的数值被修改，形状和内存地址不变。
  */
-void rope(Tensor &x, float theta) {
+void rope(Tensor &x, float theta, int position_offset) {
+    require(position_offset >= 0 && position_offset <= 8192, "invalid RoPE offset");
     validate(x);
     require(x.ndim == 3 && x.shape[2] % 2 == 0, "RoPE requires [tokens, heads, even head_dim]");
     require(std::isfinite(theta) && theta > 0, "invalid RoPE theta");
-    kernels::rope(ptr(x), (int)x.shape[0], (int)x.shape[1], (int)x.shape[2], theta);
+    kernels::rope(ptr(x), (int)x.shape[0], (int)x.shape[1], (int)x.shape[2], theta, position_offset);
 }
 
 /**
@@ -222,3 +223,15 @@ void linear(cublasHandle_t handle, Tensor &out, const Tensor &in, const Tensor &
                       (int)out.shape[1]));
 }
 } // namespace qwe
+
+namespace qwe {
+void attention_cached(Tensor &out,const Tensor &q,const Tensor &k,const Tensor &v,int offset) {
+    validate(out); validate(q); validate(k); validate(v);
+    require(q.ndim==3 && k.ndim==3 && same_shape(out,q) && same_shape(k,v),"cached attention rank/shape mismatch");
+    require(offset>=0 && k.shape[0]==offset+q.shape[0] && k.shape[0]<=8192 &&
+            q.shape[2]==k.shape[2] && q.shape[1]%k.shape[1]==0,"cached GQA shape mismatch");
+    require(out.data!=q.data && out.data!=k.data && out.data!=v.data,"cached attention alias");
+    kernels::attention_cached(ptr(out),ptr(q),ptr(k),ptr(v),(int)q.shape[0],(int)k.shape[0],
+        (int)q.shape[1],(int)k.shape[1],(int)q.shape[2],offset);
+}
+}

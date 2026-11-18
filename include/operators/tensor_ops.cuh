@@ -43,7 +43,7 @@ void norm(Tensor &out, const Tensor &in, const Tensor &weight, float eps);
  * @return 无返回值；结果通过输出参数写入。
  * @note 返回后 x 的数值被修改，形状和内存地址不变。
  */
-void rope(Tensor &x, float theta);
+void rope(Tensor &x, float theta, int position_offset = 0);
 
 /**
  * @brief 计算不读取未来位置的分组查询注意力。
@@ -83,3 +83,8 @@ void add(Tensor &x, const Tensor &y);
  */
 void linear(cublasHandle_t handle, Tensor &out, const Tensor &in, const Tensor &weight);
 } // namespace qwe
+
+namespace qwe {
+// q is suffix [queries,Qheads,dim], k/v contain [offset+queries,KVheads,dim].
+void attention_cached(Tensor &out,const Tensor &q,const Tensor &k,const Tensor &v,int offset);
+}

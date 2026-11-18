@@ -1,4 +1,5 @@
 #include "models/qwen3.cuh"
+#include "backend/cuda/kv_cache.cuh"
 #include "loader/weight_archive.hpp"
 #include "operators/tensor_ops.cuh"
 #include "backend/cuda/device_tensor.cuh"
@@ -226,6 +227,17 @@ struct Stage {
     const Tensor *head = nullptr;
     const Tensor *output_norm = nullptr;
     std::vector<Layer> layers;
+    std::vector<std::unique_ptr<KVCache>> cache;
+    void attend(size_t layer,Tensor &out,const Tensor &q,const Tensor &k,const Tensor &v,int offset,int capacity) {
+        if(!capacity) { attention(out,q,k,v); return; }
+        if(cache.size()<layers.size()) cache.resize(layers.size());
+        if(!cache[layer]) cache[layer]=std::make_unique<KVCache>(capacity,(int)k.shape[1],c.dim);
+        cache[layer]->append(k,v,offset);
+        auto keys=cache[layer]->key_view(offset+(int)q.shape[0]);
+        auto values=cache[layer]->value_view(offset+(int)q.shape[0]);
+        attention_cached(out,q,keys,values,offset);
+    }
+    size_t cache_bytes() const { size_t result=0;for(auto &p:cache) if(p) result+=p->bytes();return result; }
 
     /**
      * @brief 在指定设备加载连续层区间及必要的输入/输出权重。
@@ -289,7 +301,7 @@ struct Stage {
      * @return 本设备上拥有显存的 [n,h] 隐藏状态；不复制回 CPU。
      */
     std::unique_ptr<DeviceTensor> run(const std::vector<int> &tokens,
-                                      const DeviceTensor *incoming) {
+                                      const DeviceTensor *incoming, int offset=0, int capacity=0) {
         DeviceGuard guard(device);
         int n = (int)tokens.size(), h = c.hidden, f = c.intermediate, qd = c.heads * c.dim,
             kd = c.kvheads * c.dim;
@@ -312,6 +324,7 @@ struct Stage {
         auto k_heads = reshape(k.tensor, {n, c.kvheads, c.dim});
         auto v_heads = reshape(v.tensor, {n, c.kvheads, c.dim});
         auto attn_heads = reshape(attn.tensor, {n, c.heads, c.dim});
+        size_t layer_index=0;
         for (const Layer &l : layers) {
             // Attention 分支：预归一化 → Q/K/V 投影 → 按 head 归一化与旋转位置编码。
             norm(normed.tensor, x.tensor, *l.pre, c.eps);
@@ -320,11 +333,11 @@ struct Stage {
             linear(blas->handle, v.tensor, normed.tensor, *l.v);
             norm(q_heads, q_heads, *l.qn, c.eps);
             norm(k_heads, k_heads, *l.kn, c.eps);
-            rope(q_heads, c.theta);
-            rope(k_heads, c.theta);
+            rope(q_heads, c.theta, offset);
+            rope(k_heads, c.theta, offset);
 
             // 因果 GQA 只读取当前位置及以前的 K/V，然后投影回 h 并加上残差。
-            attention(attn_heads, q_heads, k_heads, v_heads);
+            attend(layer_index++,attn_heads,q_heads,k_heads,v_heads,offset,capacity);
             linear(blas->handle, projected.tensor, attn.tensor, *l.o);
             add(x.tensor, projected.tensor);
 
@@ -366,6 +379,8 @@ struct Stage {
 struct Qwen3::Impl {
     Config c;
     int context = 2048;
+    bool kv_enabled = false;
+    std::vector<int> cached_tokens;
     bool tp = false;
     bool profile = false;
     TransferStats transfer_stats;
@@ -394,6 +409,7 @@ struct Qwen3::Impl {
         for (int id : devices)
             if (id < 0 || id >= count)
                 throw std::runtime_error("CUDA device index out of range");
+        kv_enabled = options.kv_cache;
         profile = options.profile;
         tp = options.tensor_parallel;
         if (tp) {
@@ -426,7 +442,7 @@ struct Qwen3::Impl {
      * @note 没有 KV Cache；单请求不产生流水线重叠。
      */
 
-    HostTensor run_tp(const std::vector<int> &tokens, bool last_only) {
+    HostTensor run_tp(const std::vector<int> &tokens, bool last_only, int offset=0, int capacity=0) {
         int n=(int)tokens.size();
         struct Work {
             DeviceTensor x,normed,q,k,v,attn,projected,gate,up,other;
@@ -463,11 +479,11 @@ struct Qwen3::Impl {
             linear(blas->handle, v.tensor, normed.tensor, *l.v);
             norm(q_heads, q_heads, *l.qn, c.eps);
             norm(k_heads, k_heads, *l.kn, c.eps);
-            rope(q_heads, c.theta);
-            rope(k_heads, c.theta);
+            rope(q_heads, c.theta, offset);
+            rope(k_heads, c.theta, offset);
 
             // 因果 GQA 只读取当前位置及以前的 K/V，然后投影回 h 并加上残差。
-            attention(attn_heads, q_heads, k_heads, v_heads);
+            stage.attend(layer,attn_heads,q_heads,k_heads,v_heads,offset,capacity);
             linear(blas->handle, projected.tensor, attn.tensor, *l.o);
                 } else {
             norm(normed.tensor, x.tensor, *l.post, c.eps);
@@ -496,11 +512,20 @@ struct Qwen3::Impl {
             if (id < 0 || id >= c.vocab)
                 throw std::runtime_error("token ID outside vocabulary");
         transfer_stats = {};
-        if(tp) return run_tp(tokens,last_only);
-        std::unique_ptr<DeviceTensor> hidden;
-        for (auto &stage : stages)
-            hidden = stage->run(tokens, hidden.get());
-        return stages.back()->project(*hidden, last_only);
+        int offset=0,capacity=kv_enabled && last_only ? context : 0;
+        if(capacity && tokens.size()>cached_tokens.size() &&
+           std::equal(cached_tokens.begin(),cached_tokens.end(),tokens.begin())) offset=(int)cached_tokens.size();
+        std::vector<int> suffix(tokens.begin()+offset,tokens.end());
+        try {
+            HostTensor result = [&]() {
+                if(tp) return run_tp(suffix,last_only,offset,capacity);
+                std::unique_ptr<DeviceTensor> hidden;
+                for(auto &stage:stages) hidden=stage->run(suffix,hidden.get(),offset,capacity);
+                return stages.back()->project(*hidden,last_only);
+            }();
+            cached_tokens=capacity ? tokens : std::vector<int>{};
+            return result;
+        } catch(...) { cached_tokens.clear(); throw; }
     }
 };
 
@@ -521,6 +546,8 @@ Qwen3::~Qwen3() = default;
  * @brief 查询当前实现支持的最大输入长度。
  * @return 配置的有效上下文上限，单位为 token。
  */
+void Qwen3::reset_cache() { impl->cached_tokens.clear(); }
+size_t Qwen3::kv_cache_bytes() const { size_t bytes=0; for(auto &stage:impl->stages) bytes+=stage->cache_bytes(); return bytes; }
 TransferStats Qwen3::last_transfer_stats() const { return impl->transfer_stats; }
 int Qwen3::context_limit() const {
     return impl->context;

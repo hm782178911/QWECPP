@@ -9,6 +9,7 @@ namespace qwe {
 struct Qwen3Options {
     std::vector<int> devices;         // 空列表表示使用当前设备；当前支持一个或两个不同设备。
     int max_context = 2048; // 当前引擎支持 1..8192，再取模型位置上限。
+    bool kv_cache = false; // last_only 前向复用本实例的精确前缀 K/V。 // Optional last-position incremental inference.
     bool profile = false; // 启用通信诊断计时。
     bool tensor_parallel = false;    // 两卡张量并行；不与 split_layer 混用。
     int split_layer = -1;             // 第二阶段的起始层，-1 表示均分；仅两卡有效。
@@ -39,7 +40,7 @@ class Qwen3 {
      * @param[in] tokens 完整上下文的 token ID，长度为 1～context_limit()，每个 ID 必须在词表内。
      * @param[in] last_only true 只投影最后位置；false 返回所有输入位置。
      * @return 拥有 CPU 内存的 HostTensor；FP32 行优先，形状为 [last_only?1:n, vocab]。
-     * @note 不修改 tokens；每次从位置 0 重算完整序列，不维护 KV Cache。
+     * @note 不修改 tokens；默认重算完整序列；kv_cache 开启且 last_only=true 时复用精确前缀，仅处理新增后缀。
      * @note GPU 计算完成后复制结果到 CPU；返回对象销毁时自动释放其 CPU 内存。
      */
     HostTensor forward(const std::vector<int> &tokens, bool last_only = false);
@@ -50,6 +51,9 @@ class Qwen3 {
      */
     int context_limit() const;
     TransferStats last_transfer_stats() const;
+    // 使前缀失效，下一次重新 prefill；保留已分配容量供复用。
+    void reset_cache();
+    size_t kv_cache_bytes() const;
 };
 
 /**

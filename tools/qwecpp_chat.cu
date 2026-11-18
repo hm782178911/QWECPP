@@ -97,6 +97,8 @@ int main(int argc, char **argv) {
             int output_tokens;
             double ttft, first_text, total, tpot;
             qwe::TransferStats comm;
+            double prefill_ms,decode_ms;
+            size_t cache_bytes;
             size_t dropped_turns;
         };
         std::vector<Metrics> metrics;
@@ -107,9 +109,10 @@ int main(int argc, char **argv) {
             std::string key = argv[i];
             if (key == "--help") {
                 std::cout << "Usage: qwecpp_chat --model DIR [--max-new-tokens 128] [--devices "
-                             "0,1] [--max-context 2048] [--parallel pp|tp] [--split-layer 14] [--pp-host-transfer] [--debug] [--sliding-window]\n";
+                             "0,1] [--max-context 2048] [--parallel pp|tp] [--split-layer 14] [--pp-host-transfer] [--kv-cache] [--debug] [--sliding-window]\n";
                 return 0;
             }
+            if(key=="--kv-cache") { options.kv_cache=true; continue; }
             if (key == "--sliding-window") {
                 sliding_window = true;
                 continue;
@@ -179,6 +182,7 @@ int main(int argc, char **argv) {
             if (line.empty())
                 continue;
 
+            model.reset_cache();
             auto request_start = Clock::now();
             // 先在副本中加入输入；超限或编码失败时不污染已有历史。
             auto next = history;
@@ -211,6 +215,7 @@ int main(int argc, char **argv) {
             std::cout << "助手> " << std::flush;
             std::string reply, pending;
             bool stopped = false;
+            double prefill_ms=0,decode_ms=0;
             int generated = 0;
             qwe::TransferStats comm;
             size_t input_tokens = ids.size();
@@ -218,7 +223,10 @@ int main(int argc, char **argv) {
             Clock::time_point first_token, last_token;
             for (; generated < max_new && ids.size() < (size_t)model.context_limit(); ++generated) {
                 // 无 KV Cache：每步重算上下文，只取最后位置的 logits 做贪心选择。
+                auto forward_start=Clock::now();
                 auto logits = model.forward(ids, true);
+                double elapsed=ms(forward_start,Clock::now());
+                if(generated==0) prefill_ms+=elapsed; else decode_ms+=elapsed;
                 if(debug) {
                     auto step=model.last_transfer_stats();
                     comm.calls+=step.calls; comm.bytes+=step.bytes;
@@ -252,7 +260,7 @@ int main(int argc, char **argv) {
             if (debug)
                 metrics.push_back({input_tokens, generated, ttft, first_text,
                     ms(request_start, Clock::now()),
-                    generated > 1 ? ms(first_token, last_token)/(generated-1) : -1, comm, dropped_turns});
+                    generated > 1 ? ms(first_token, last_token)/(generated-1) : -1, comm, prefill_ms, decode_ms, model.kv_cache_bytes(), dropped_turns});
             next.push_back({"assistant", reply});
             history = std::move(next);
             if (!stopped) {
@@ -271,6 +279,9 @@ int main(int argc, char **argv) {
                 std::cerr << "[debug] turn=" << i+1
                     << " input_tokens=" << m.input_tokens
                     << " dropped_turns=" << m.dropped_turns
+                    << " kv_cache=" << options.kv_cache
+                    << " kv_cache_bytes=" << m.cache_bytes
+                    << " prefill_ms=" << m.prefill_ms << " decode_ms=" << m.decode_ms
                     << " output_tokens=" << m.output_tokens
                     << " ttft_ms=" << m.ttft
                     << " first_text_ms=" << m.first_text

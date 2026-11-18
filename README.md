@@ -30,10 +30,11 @@ QWECPP 是一个以 C / CUDA 为核心的 LLM 推理引擎。从 Qwen3-0.6B 出�
 | 原生聊天 | Tokenizer、多轮历史、流式 UTF-8 输出、贪心解码 |
 | 多 GPU | 两卡 PP 按层执行、两卡 TP 按 head / MLP 通道切分 |
 | 上下文 | 默认 **2048 token**，`--max-context` 可配置至 **8192** |
+| KV Cache | 可选 `--kv-cache`，单卡 / PP / TP；默认关闭 |
 | 历史管理 | 可选滑动窗口，默认关闭 |
 | 性能诊断 | 首 token / 首文本延迟、TPOT、吞吐、TP 通信统计 |
 
-**当前边界：** 尚无 KV Cache，每个新 token 都重算上下文；PP 暂无多请求流水线重叠，TP 暂无 NCCL 或显式通信计算重叠。不支持 PP + TP 混合，也不承诺单请求加速。
+**当前边界：** 默认不启用 KV Cache；可通过 `--kv-cache` 在每轮生成内复用历史 K/V。每轮仍重新 prefill；PP 暂无多请求流水线重叠，TP 暂无 NCCL 或显式通信计算重叠。不支持 PP + TP 混合，也不承诺单请求加速。
 
 模型支持范围为 Qwen3 SiLU 文本架构：未缩放 RoPE、无 attention bias、无模型 Sliding Window Attention。聊天历史裁剪与模型的窗口注意力是不同功能。
 
@@ -82,7 +83,7 @@ cmake --build build -j8
 ```bash
 ./build/bin/qwecpp_chat \
   --model /home/hzy/models/Qwen/Qwen3-8B \
-  --parallel tp --devices 0,1 --max-context 4096 --debug
+  --parallel tp --devices 0,1 --max-context 4096 --kv-cache --debug
 ```
 
 **两卡 PP：**
@@ -104,11 +105,20 @@ cmake --build build -j8
 | `--max-context 4096` | 2048 | 输入、模板、历史和回复共用的上下文上限，最高 8192 |
 | `--max-new-tokens 128` | 128 | 每轮最多生成的 token 数，范围 1..256 |
 | `--sliding-window` | 关闭 | 空间不足时移除最早完整对话轮次 |
+| `--kv-cache` | 关闭 | 每轮首次 prefill，后续仅计算新增 token；缓存本地 KV heads |
 | `--debug` | 关闭 | 退出时打印每轮性能与 TP 通信指标 |
 
 开启滑动窗口会为输出预留空间，超长的单个问题仍会被拒绝。模型原生位置上限可能高于 8192，但当前 kernel 支持上限为 8192。
 
 更多选项、token ID 前向和输出文件格式见 [命令行参考](docs/usage-reference.md)。
+
+### 可选 KV Cache
+
+追加 `--kv-cache` 可启用 FP32 K/V 缓存。首次前向执行 prefill；后续对精确前缀只处理新增 token，RoPE 使用绝对位置。TP 缓存本卡 KV heads，PP 缓存本阶段层。聊天每轮重新 prefill，不跨对话轮次复用；clear/滑动历史后的输入重新建立缓存。缓存按 max-context 预留容量、按层首次使用时分配，reset 使逻辑前缀失效但保留显存；关闭模型时释放。完整位置输出 forward(last_only=false) 保持不缓存。
+
+--debug 附带 kv_cache（开关）、kv_cache_bytes（所有 GPU 上已分配缓存总字节，不含权重/工作区）、prefill_ms（本轮首次模型调用墙钟时间）、decode_ms（后续调用累计时间，含终止 EOS 检查）。关闭缓存时后续调用仍是完整重算，decode_ms 只表示生成阶段计时。首次缓存分配开销计入 prefill；对比应预热并使用相同开关之外的参数。
+
+数值测试：`build/bin/test_kv_cache MODEL_DIR [single|pp|tp] [测试上下文上限]`；聊天对照：`python3 tests/models/test_kv_chat.py`。详见 [KV Cache 开发记录](dev-notes/2026-11-18-kv-cache.md)。
 
 ## 4. Project Structure
 
@@ -167,6 +177,7 @@ ctest --test-dir build --output-on-failure
 
 `--debug` 在退出时向 stderr 输出 TTFT、首文本延迟、TPOT、token/s 和 TP 通信计数/耗时。通信计时含同步等待，不能当作纯链路带宽；首轮冷启动应与预热后的结果分开。
 
+- [KV Cache 开关对照](benchmarks/kv-cache/20261118-104036/README.md)：同一版本、同输入，预热后重复测量。
 - [无 KV Cache 模型基线](benchmarks/baselines/2026-11-17-no-kv/README.md)：逐次数据、环境、源码快照；旧上下文口径为 256。
 - [P2P / 主机中转实验](benchmarks/p2p/2026-11-17/)：独立测试源码和日志。
 - [指标口径](docs/usage-reference.md#debug-指标与性能基线)：计时边界与逻辑字节定义。
@@ -182,14 +193,15 @@ ctest --test-dir build --output-on-failure
 | Phase 3 | 核心 GPU 算子 | 正确性参考实现完成，性能待优化 |
 | Phase 4 | Qwen3 端到端推理 | 0.6B / 8B、原生聊天可用 |
 | Phase 5 | 多 GPU 执行 | 两卡 PP / TP 基础实现完成 |
-| Phase 6 | 推理性能优化 | 待实现 KV Cache、prefill / decode 分离与通信优化 |
+| Phase 6 | 推理性能优化 | KV Cache 基础实现完成，继续优化 prefill / decode 与通信 |
 | Phase 7 | 更多架构与执行能力 | 后续扩展 |
 
-近期重点是抽取公共并行算子与 ParallelContext、复用工作区，再逐项量化 KV Cache、算子和通信优化的收益。滑动窗口策略后续再优化。
+近期重点是抽取公共并行算子与 ParallelContext、复用工作区，逐项量化 KV Cache、算子和通信优化的收益。滑动窗口策略后续再优化。
 
 ## 8. Documentation
 
 - [开发记录索引](dev-notes/README.md)
+- [2026-11-18 可选 KV Cache](dev-notes/2026-11-18-kv-cache.md)
 - [2026-11-17 跨对话更新总览](dev-notes/2026-11-17-overview.md)
 - [TP、诊断、8B 与长上下文详细记录](dev-notes/2026-11-17-tp-and-runtime.md)
 - [架构说明](docs/architecture.md)

@@ -70,7 +70,7 @@ PP 按连续层切两阶段，首阶段持有 Embedding，末阶段持有最终 
 
 TP 将 Q/K/V、Gate/Up 按输出维分片，O/Down 按输入维分片；Attention/MLP 局部输出各求和一次。每卡持有完整残差状态，Embedding/归一化/词表头复制，最终仅 rank 0 做词表投影。Q heads、KV heads 和 intermediate 必须能被 2 整除；不支持与 split-layer 混用。
 
-两者复用 P2P 优先的 transfer，保留首次完整性校验及主机回退。历史 peer copy 数据异常已通过一次性 `iommu=pt` 启动对照恢复正确性；未改 BIOS 或永久启动配置，重启后需重新确认。仓库保留完整性校验与回退。本次 TP 检查全部走 P2P。当前无 NCCL、PP+TP 组合或显式通信计算重叠，不承诺单请求加速。
+两者复用 P2P 优先的 transfer，保留首次完整性校验及主机回退。历史 peer copy 数据异常已通过一次性 `iommu=pt` 启动对照恢复正确性；未改 BIOS 或永久启动配置，重启后需重新确认。仓库保留完整性校验与回退。本次 TP 检查全部走 P2P。支持可选 --kv-cache；当前无 NCCL、PP+TP 组合或显式通信计算重叠，不承诺单请求加速。
 
 ## Debug 指标与性能基线
 
@@ -115,3 +115,7 @@ $PY tests/models/test_long_reference.py /home/hzy/models/Qwen/Qwen3-8B 512
 另有 `test_pp.py`、`test_tokenizer.py`、`test_chat.py`，参数为可执行文件和模型目录；聊天测试可追加运行选项。部分专项脚本使用本机路径及双卡条件。
 
 0.6B TP 全 logits 使用 atol=3e-4、rtol=1e-4；8B 对 Transformers FP32 使用 atol=1e-3，TP 对单卡使用 atol=2e-3，rtol 均为 1e-4。原 0.6B 容差未放宽。已验证范围、实际误差和局限见 [本次开发记录](../dev-notes/2026-11-17-tp-and-runtime.md)。8192 算子测试不代表所有模型在该长度的全 logits 都已验证。
+
+## KV Cache 开关
+
+聊天添加 `--kv-cache`，默认关闭。每轮内 prefill + 增量 decode，跨轮重新 prefill；支持单卡/PP/TP。debug 增加 kv_cache、kv_cache_bytes、prefill_ms、decode_ms。缓存容量随 max-context，reset 保留分配但清除有效前缀；完整 logits 模式不启用缓存。细节以根 README 的“可选 KV Cache”为准。

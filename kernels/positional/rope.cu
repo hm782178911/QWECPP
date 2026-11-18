@@ -18,11 +18,11 @@ namespace qwe::kernels {
  * @note 由算子层预先校验维度、类型、设备、布局和缓冲区大小；本层不分配显存。
  * @note 这是设备函数，必须通过 CUDA kernel launch 调用。
  */
-__global__ void rope_kernel(float *x, int heads, int dim, float theta, int n) {
+__global__ void rope_kernel(float *x, int heads, int dim, float theta, int n, int offset) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n * heads * (dim / 2))
         return;
-    int j = i % (dim / 2), row = i / (dim / 2), position = row / heads;
+    int j = i % (dim / 2), row = i / (dim / 2), position = offset + row / heads;
     float angle = position * powf(theta, -2.0f * j / dim), s, c;
     sincosf(angle, &s, &c);
     float a = x[(size_t)row * dim + j], b = x[(size_t)row * dim + j + dim / 2];
@@ -41,9 +41,9 @@ __global__ void rope_kernel(float *x, int heads, int dim, float theta, int n) {
  * @note 由算子层预先校验维度、类型、设备、布局和缓冲区大小；本层不分配显存。
  * @note 仅提交默认 stream 上的工作，返回不代表 GPU 已执行完成。
  */
-void rope(float *x, int n, int h, int d, float theta) {
+void rope(float *x, int n, int h, int d, float theta, int position_offset) {
     int count = n * h * (d / 2);
-    rope_kernel<<<(count + 255) / 256, 256>>>(x, h, d, theta, n);
+    rope_kernel<<<(count + 255) / 256, 256>>>(x, h, d, theta, n, position_offset);
     check(cudaGetLastError());
 }
 } // namespace qwe::kernels

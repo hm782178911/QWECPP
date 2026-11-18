@@ -24,15 +24,15 @@ namespace qwe::kernels {
  * @note 每个 block 对应一个 Query 位置/head，blockDim.x 必须为 256。
  */
 __global__ void attention_kernel(
-    float *out, const float *q, const float *k, const float *v, int n, int h, int kh, int d) {
+    float *out, const float *q, const float *k, const float *v, int n, int h, int kh, int d, int offset) {
     extern __shared__ float scores[];
-    int t = threadIdx.x, head = blockIdx.x % h, pos = blockIdx.x / h, kv = head / (h / kh);
+    int t = threadIdx.x, head = blockIdx.x % h, row = blockIdx.x / h, pos = offset + row, kv = head / (h / kh);
 
     // 只计算 [0, pos] 的 Q·K 分数；同组 Query head 使用相同的 KV head。
     for (int s = t; s <= pos; s += blockDim.x) {
         float dot = 0;
         for (int j = 0; j < d; ++j)
-            dot += q[((size_t)pos * h + head) * d + j] * k[((size_t)s * kh + kv) * d + j];
+            dot += q[((size_t)row * h + head) * d + j] * k[((size_t)s * kh + kv) * d + j];
         scores[s] = dot * rsqrtf((float)d);
     }
     __syncthreads();
@@ -57,7 +57,7 @@ __global__ void attention_kernel(
         float sum = 0;
         for (int s = 0; s <= pos; ++s)
             sum += scores[s] * v[((size_t)s * kh + kv) * d + j];
-        out[((size_t)pos * h + head) * d + j] = sum;
+        out[((size_t)row * h + head) * d + j] = sum;
     }
 }
 
@@ -79,7 +79,12 @@ void attention(
     float *o, const float *q, const float *k, const float *v, int n, int h, int kh, int d) {
     if (n < 1 || n > 8192 || h % kh)
         throw std::runtime_error("unsupported attention dimensions");
-    attention_kernel<<<n * h, 256, (size_t)n*sizeof(float)>>>(o, q, k, v, n, h, kh, d);
+    attention_kernel<<<n * h, 256, (size_t)n*sizeof(float)>>>(o, q, k, v, n, h, kh, d, 0);
+    check(cudaGetLastError());
+}
+void attention_cached(float *o,const float *q,const float *k,const float *v,
+                      int queries,int total,int h,int kh,int d,int offset) {
+    attention_kernel<<<queries*h,256,(size_t)total*sizeof(float)>>>(o,q,k,v,total,h,kh,d,offset);
     check(cudaGetLastError());
 }
 } // namespace qwe::kernels

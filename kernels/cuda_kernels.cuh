@@ -52,7 +52,7 @@ void norm(float *out, const float *in, const float *weight, int rows, int width,
  * @note 由算子层预先校验维度、类型、设备、布局和缓冲区大小；本层不分配显存。
  * @note 仅提交默认 stream 上的工作，返回不代表 GPU 已执行完成。
  */
-void rope(float *x, int tokens, int heads, int dim, float theta);
+void rope(float *x, int tokens, int heads, int dim, float theta, int position_offset = 0);
 
 /**
  * @brief 启动封装：计算缩放点积、因果 Softmax 和对 V 的加权求和。
@@ -99,3 +99,7 @@ void silu_mul(float *gate, const float *up, int n);
  */
 void add(float *x, const float *y, int n);
 } // namespace qwe::kernels
+
+namespace qwe::kernels {
+void attention_cached(float*,const float*,const float*,const float*,int,int,int,int,int,int);
+}
