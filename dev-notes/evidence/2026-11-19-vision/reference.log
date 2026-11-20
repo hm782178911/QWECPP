@@ -1,0 +1,8 @@
+Loading weights:   0%|          | 0/473 [00:00<?, ?it/s]Loading weights: 100%|██████████| 473/473 [00:00<00:00, 5826.81it/s]
+256 256 png patches 256 features_max 2.1219253540039062e-05 logits_max 4.982948303222656e-05 argmax 112148 112148
+256 384 png patches 384 features_max 1.52587890625e-05 logits_max 4.982948303222656e-05 argmax 112148 112148
+73 97 png patches 280 features_max 3.266334533691406e-05 logits_max 4.172325134277344e-05 argmax 112148 112148
+640 800 png patches 952 features_max 0.00022423267364501953 logits_max 0.00013136863708496094 argmax 112148 112148
+256 256 jpeg patches 256 features_max 6.318092346191406e-05 logits_max 6.151199340820312e-05 argmax 112148 112148
+two images logits_max 0.00011539459228515625
+native image preprocessing, vision features, MRoPE and multimodal logits reference passed

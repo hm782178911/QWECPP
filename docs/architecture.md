@@ -32,3 +32,11 @@ KVCache 在 backend/cuda 持有每层 FP32 K/V；Stage 负责追加并调用缓�
 PD 在同一 `Qwen3` 实例中建立两组 Stage，第一组执行 Prefill 并产生首 token。第一次增量前向通过公共 CUDA transfer 逐层传输有效 FP32 K/V，形状为 `[prefix_length, kvheads, head_dim]`。两组分别拥有缓存，按上下文容量分配。目的端完成全部交接后才执行后缀计算，后续增量前向留在 Decode 组。reset、非追加输入和前向执行异常使逻辑前缀失效，分配保留供复用。完整位置前向在 Prefill 组计算，并使缓存失效。
 
 四卡 PD 的两组使用同一并行布局。PP 按层区间、TP 按 KV head 分片交接；每个 Prefill rank 只向对应的 Decode rank 复制。TP 组内通信与 KV 交接各自记录统计。
+
+## Qwen3.5 模型分派
+
+TextModel在CLI根据config.model_type选择Qwen3或独立Qwen3_5。Qwen3.5混合层编排在模型文件，新增运算仍通过operators调度kernels；WeightStore公共化复用。Reader元数据允许8维而计算Tensor仍最多4维。Qwen3.5无跨调用状态缓存或并行；视觉链路见下一节，详细边界见2026-11-19开发记录。
+
+## 静态图片链路
+
+runtime/ImageInput负责CPU解码/缩放和patch打包；Qwen3_5Vision独立组织视觉Transformer，共用严格形状校验的GPU权重加载；operators/vision_ops和kernels/attention/vision负责计算。图文前向按占位位置替换embedding，按T/H/W计算MRoPE。HTTP每请求编码各图片一次，生成中复用GPU视觉特征；不是视觉KV缓存，文本层仍重算。参见docs/multimodal.md和2026-11-19图文记录。

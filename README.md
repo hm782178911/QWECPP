@@ -4,7 +4,7 @@
 
 *Build from the Metal Up.*
 
-QWECPP 是一个以 C / CUDA 为核心的 LLM 推理引擎。从 Qwen3-0.6B 出发，逐步实现权重加载、GPU 算子、端到端推理与多 GPU 执行，目前已支持 Qwen3-8B。
+QWECPP 是一个以 C / CUDA 为核心的 LLM 推理引擎。从 Qwen3-0.6B 出发，逐步实现权重加载、GPU 算子、端到端推理与多 GPU 执行，目前已支持 Qwen3-8B，以及 Qwen3.5-0.8B 单卡图文推理和网页聊天。
 
 项目的核心目标是理解并实现 LLM 推理的底层基础设施。Python 只用于参考验证和性能分析，不进入推理执行链路。
 
@@ -25,18 +25,19 @@ QWECPP 是一个以 C / CUDA 为核心的 LLM 推理引擎。从 Qwen3-0.6B 出�
 | --- | --- |
 | Tensor 与内存 | CPU / CUDA 元数据、设备编号、显存和 CPU 输出所有权 |
 | 权重加载 | Safetensors 单文件、索引多分片；BF16 / FP16 / FP32 → FP32 |
-| 模型 | Qwen3-0.6B、Qwen3-8B，batch = 1 |
+| 模型 | Qwen3-0.6B、Qwen3-8B；Qwen3.5-0.8B 单卡图文，batch = 1 |
 | GPU 算子 | Embedding、RMSNorm、RoPE、因果 GQA、SwiGLU、残差、Linear |
 | 原生聊天 | Tokenizer、多轮历史、流式 UTF-8 输出、贪心解码 |
 | 多 GPU | 两卡 PP 按层执行、两卡 TP 按 head / MLP 通道切分、同机两卡 PD |
 | 上下文 | 默认 **2048 token**，`--max-context` 可配置至 **8192** |
-| KV Cache | 可选 `--kv-cache`，单卡 / PP / TP；默认关闭 |
+| 网页服务 | 原生 HTTP / SSE、图文上传、浏览器会话保存 |
+| KV Cache（Qwen3） | 可选 `--kv-cache`，单卡 / PP / TP；默认关闭 |
 | 历史管理 | 可选滑动窗口，默认关闭 |
 | 性能诊断 | 首 token / 首文本延迟、TPOT、吞吐、TP 通信统计 |
 
-**当前边界：** 默认不启用 KV Cache；可通过 `--kv-cache` 在每轮生成内复用历史 K/V。每轮仍重新 prefill；PP 暂无多请求流水线重叠，TP 暂无 NCCL 或显式通信计算重叠。不支持 PP + TP 混合，也不承诺单请求加速。
+**当前边界（以下缓存与多卡能力针对 Qwen3）：** 默认不启用 KV Cache；可通过 `--kv-cache` 在每轮生成内复用历史 K/V。每轮仍重新 prefill；PP 暂无多请求流水线重叠，TP 暂无 NCCL 或显式通信计算重叠。不支持 PP + TP 混合，也不承诺单请求加速。
 
-模型支持范围为 Qwen3 SiLU 文本架构：未缩放 RoPE、无 attention bias、无模型 Sliding Window Attention。聊天历史裁剪与模型的窗口注意力是不同功能。
+Qwen3 支持范围为 SiLU 文本架构：未缩放 RoPE、无 attention bias、无模型 Sliding Window Attention。聊天历史裁剪与模型的窗口注意力是不同功能。
 
 ## 3. Quick Start
 
@@ -94,7 +95,16 @@ cmake --build build -j8
   --parallel pp --devices 0,1 --split-layer 14
 ```
 
-输入一行后回车即可生成回复。`/clear` 清空历史，`/exit` 或 EOF 退出。默认非思考、贪心解码，不支持工具调用和多模态。
+输入一行后回车即可生成回复。`/clear` 清空历史，`/exit` 或 EOF 退出。默认非思考、贪心解码；该终端入口仅处理文本，不支持工具调用。图片使用下方网页服务或图文 CLI。
+
+### Qwen3.5-0.8B（单卡图文）
+
+```bash
+./build/bin/qwecpp_chat --model /home/hzy/models/Qwen/Qwen3.5-0.8B --devices 0 --max-new-tokens 32 --debug
+./build/bin/qwecpp_forward --model /home/hzy/models/Qwen/Qwen3.5-0.8B --tokens 1,2,3,4
+```
+
+按 config.model_type 自动选择独立 qwen3_5 实现。支持 Gated DeltaNet / 门控完整注意力混合层、部分 RoPE、原生文本分词与多轮聊天。支持已验证0.8B配置，FP32完整上下文重算；图片后端已接通，**不支持视频/音频、Qwen3.5 KV/递推状态缓存、PP/TP/PD**，这些组合明确拒绝。现有Qwen3能力不变。文件Reader元数据扩展至8维以读取含视觉权重的检查点，但计算Tensor仍最多4维，视觉权重按需加载，仅文本请求不加载视觉编码器。数值参考显式使用Transformers PyTorch回退路径；不保证与其可选融合kernel逐位一致。
 
 ### 3.3 常用参数
 
@@ -112,7 +122,7 @@ cmake --build build -j8
 
 更多选项、token ID 前向和输出文件格式见 [命令行参考](docs/usage-reference.md)。
 
-### 可选 KV Cache
+### 可选 KV Cache（Qwen3）
 
 追加 `--kv-cache` 可启用 FP32 K/V 缓存。首次前向执行 prefill；后续对精确前缀只处理新增 token，RoPE 使用绝对位置。TP 缓存本卡 KV heads，PP 缓存本阶段层。聊天每轮重新 prefill，不跨对话轮次复用；clear/滑动历史后的输入重新建立缓存。缓存按 max-context 预留容量、按层首次使用时分配，reset 使逻辑前缀失效但保留显存；关闭模型时释放。完整位置输出 forward(last_only=false) 保持不缓存。
 
@@ -141,17 +151,18 @@ QWECPP/
 │   ├── core/               # DType、Tensor 与 CPU 输出所有权
 │   ├── backend/cuda/       # CUDA 设备、显存与跨卡传输
 │   ├── loader/             # Safetensors / 分片权重接口
-│   ├── models/             # Qwen3 模型接口
+│   ├── models/             # Qwen3 / Qwen3.5 模型接口
 │   ├── operators/          # Tensor 算子接口
 │   └── runtime/            # Tokenizer、设备选项
 ├── src/                    # 对应模块的实现
 ├── kernels/                # CUDA kernel，按运算类型组织
-├── tools/                  # chat、forward、inspect、tokenize CLI
+├── tools/                  # chat、forward、image、server 等入口
+├── web/                    # 原生服务的静态聊天网页
 ├── tests/                  # 单元、算子与模型参考测试
 ├── benchmarks/             # 模型基线与独立通信实验
 ├── dev-notes/              # 按日期整理的开发记录
 ├── docs/                   # 架构、设计与使用参考
-├── third_party/            # cJSON 源码与许可证
+├── third_party/            # cJSON、cpp-httplib、stb 源码与许可证
 └── CMakeLists.txt
 ```
 
@@ -220,3 +231,17 @@ ctest --test-dir build --output-on-failure
 - [架构说明](docs/architecture.md)
 - [命令行与诊断参考](docs/usage-reference.md)
 - [PP 设计](docs/pp-design.md) / [TP 初始设计](docs/tp-design.md)
+
+新增记录：[Qwen3.5-0.8B](dev-notes/2026-11-19-qwen35.md) · [静态图片](dev-notes/2026-11-19-multimodal.md) · [上传与交付检查](dev-notes/2026-11-20-web-upload.md)。
+
+## 网页聊天服务
+
+```bash
+./build/bin/qwecpp_server --model /home/hzy/models/Qwen/Qwen3.5-0.8B --host 0.0.0.0 --port 8080 --web-root web
+```
+
+打开服务器8080端口即可使用。参考llama.cpp的会话侧栏、流式聊天、设置与统计，直接调用原生引擎。支持浏览器本地会话和停止生成，支持 PNG/JPEG 选择或拖放上传、附件预览与移除、图文问答；图片随会话保存在浏览器 IndexedDB。每个会话累计最多 4 张 / 8 MiB。默认仅监听127.0.0.1；启动示例开放可信局域网，无认证/TLS，不直接面向公网。
+
+[网页服务/API说明](docs/web-server.md) · [开发记录](dev-notes/2026-11-19-web-server.md)
+
+图片后端：[使用与边界](docs/multimodal.md) · [图文验证记录](dev-notes/2026-11-19-multimodal.md)。

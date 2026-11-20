@@ -85,13 +85,19 @@ if(QWECPP_ENABLE_CUDA)
         kernels/positional/rope.cu
         kernels/attention/attention.cu
         kernels/activation/elementwise.cu
-        src/models/qwen3.cu)
+        src/models/qwen3.cu
+        src/models/qwen3_5.cu
+        src/models/qwen3_5_vision.cu
+        src/operators/vision_ops.cu
+        kernels/attention/vision.cu
+        src/operators/qwen35.cu
+        kernels/attention/qwen35.cu)
     set_target_properties(qwecpp_cuda PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
     target_include_directories(qwecpp_cuda PUBLIC ${PROJECT_SOURCE_DIR}/include PRIVATE ${PROJECT_SOURCE_DIR}/kernels)
     target_link_libraries(qwecpp_cuda PUBLIC qwecpp_loader CUDA::cudart CUDA::cublas PRIVATE qwecpp_json)
     add_executable(qwecpp_forward tools/qwecpp_forward.cu)
     set_target_properties(qwecpp_forward PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
-    target_link_libraries(qwecpp_forward PRIVATE qwecpp_cuda)
+    target_link_libraries(qwecpp_forward PRIVATE qwecpp_cuda qwecpp_json)
     add_executable(test_cuda_tensor tests/operators/test_cuda_tensor.cu)
     set_target_properties(test_cuda_tensor PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
     target_link_libraries(test_cuda_tensor PRIVATE qwecpp_cuda)
@@ -112,13 +118,28 @@ if(QWECPP_ENABLE_CUDA AND QWECPP_ENABLE_CHAT)
     find_path(PCRE2_INCLUDE_DIR pcre2.h REQUIRED)
     find_library(PCRE2_LIBRARY NAMES pcre2-8 REQUIRED)
     find_package(ICU REQUIRED COMPONENTS uc)
-    add_library(qwecpp_tokenizer STATIC src/runtime/tokenizer.cpp)
+    add_library(qwecpp_tokenizer STATIC src/runtime/tokenizer.cpp src/runtime/image_input.cpp)
     target_compile_features(qwecpp_tokenizer PUBLIC cxx_std_17)
-    target_include_directories(qwecpp_tokenizer PUBLIC ${PROJECT_SOURCE_DIR}/include PRIVATE ${PCRE2_INCLUDE_DIR})
+    target_include_directories(qwecpp_tokenizer PUBLIC ${PROJECT_SOURCE_DIR}/include PRIVATE ${PCRE2_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/third_party/stb)
     target_link_libraries(qwecpp_tokenizer PUBLIC qwecpp_json ${PCRE2_LIBRARY} ICU::uc)
     add_executable(qwecpp_tokenize tools/qwecpp_tokenize.cpp)
     target_link_libraries(qwecpp_tokenize PRIVATE qwecpp_tokenizer)
     add_executable(qwecpp_chat tools/qwecpp_chat.cu)
     set_target_properties(qwecpp_chat PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
-    target_link_libraries(qwecpp_chat PRIVATE qwecpp_cuda qwecpp_tokenizer)
+    target_link_libraries(qwecpp_chat PRIVATE qwecpp_cuda qwecpp_tokenizer qwecpp_json)
+endif()
+
+if(QWECPP_ENABLE_CUDA AND QWECPP_ENABLE_CHAT)
+    find_package(Threads REQUIRED)
+    add_executable(qwecpp_server tools/qwecpp_server.cu)
+    set_target_properties(qwecpp_server PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+    target_include_directories(qwecpp_server PRIVATE ${PROJECT_SOURCE_DIR}/third_party/cpp-httplib)
+    target_compile_definitions(qwecpp_server PRIVATE CPPHTTPLIB_THREAD_POOL_COUNT=4)
+    target_link_libraries(qwecpp_server PRIVATE qwecpp_cuda qwecpp_tokenizer qwecpp_json Threads::Threads)
+endif()
+
+if(QWECPP_ENABLE_CUDA AND QWECPP_ENABLE_CHAT)
+    add_executable(qwecpp_image tools/qwecpp_image.cu)
+    set_target_properties(qwecpp_image PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+    target_link_libraries(qwecpp_image PRIVATE qwecpp_cuda qwecpp_tokenizer qwecpp_json)
 endif()

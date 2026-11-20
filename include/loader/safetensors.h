@@ -6,7 +6,8 @@ typedef struct {
     char *name;
     DType dtype;
     int ndim;
-    int64_t shape[4];
+    // 文件元数据最多8维；计算Tensor仍最多4维。
+    int64_t shape[8];
     uint64_t data_offset, data_size, numel;
 } SafeTensorEntry;
 typedef struct {

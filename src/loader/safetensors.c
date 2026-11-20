@@ -199,8 +199,8 @@ int safetensors_open(SafeTensorFile *f, const char *path) {
             why = "unsupported dtype";
             goto fail;
         }
-        if (!cJSON_IsArray(shape) || (e->ndim = cJSON_GetArraySize(shape)) > 4) {
-            why = "unsupported shape (maximum rank 4)";
+        if (!cJSON_IsArray(shape) || (e->ndim = cJSON_GetArraySize(shape)) > 8) {
+            why = "unsupported shape (maximum rank 8)";
             goto fail;
         }
         e->numel = 1;

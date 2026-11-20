@@ -1,4 +1,4 @@
-#include "models/qwen3.cuh"
+#include "runtime/text_model.cuh"
 #include "runtime/device_options.h"
 #include <algorithm>
 #include <fstream>
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
                 break;
             start = end + 1;
         } while (true);
-        qwe::Qwen3 runtime(model, options);
+        qwe::TextModel runtime(model, options);
         auto logits = runtime.forward(ids);
         size_t vocab = logits.size() / ids.size();
         if (!output.empty()) {

@@ -119,3 +119,7 @@ $PY tests/models/test_long_reference.py /home/hzy/models/Qwen/Qwen3-8B 512
 ## KV Cache 开关
 
 聊天添加 `--kv-cache`，默认关闭。每轮内 prefill + 增量 decode，跨轮重新 prefill；支持单卡/PP/TP。debug 增加 kv_cache、kv_cache_bytes、prefill_ms、decode_ms。缓存容量随 max-context，reset 保留分配但清除有效前缀；完整 logits 模式不启用缓存。细节以根 README 的“可选 KV Cache”为准。
+
+## Qwen3.5-0.8B
+
+--model指向Qwen3.5目录时自动使用独立纯文本单卡实现。仅支持已验证0.8B配置，暂不支持该模型的缓存、PP/TP/PD；新增PNG/JPEG图文后端见multimodal.md。Qwen3的原有开关支持范围不变。详见 [开发记录](../dev-notes/2026-11-19-qwen35.md)。

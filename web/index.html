@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QWECPP · Chat</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <aside id="sidebar">
+      <a class="brand" href="/"
+        ><span class="logo">Q</span>QWECPP<span class="tag">LOCAL</span></a
+      ><button id="newChat" class="new">＋ 新建对话 <kbd>⌘ K</kbd></button>
+      <div class="section-label">最近对话</div>
+      <nav id="sessions" aria-label="会话列表"></nav>
+      <footer>
+        <span class="dot"></span> 原生推理 · 数据留在本机
+        <div>C / CUDA · Built from the metal up.</div>
+      </footer>
+    </aside>
+    <main>
+      <header>
+        <button id="menu" aria-label="切换会话侧栏">☰</button>
+        <div>
+          <strong id="model">正在连接模型…</strong
+          ><span id="engine">QWECPP INFERENCE</span>
+        </div>
+        <div class="header-right">
+          <span id="status"><span class="dot"></span>连接中</span
+          ><button id="settingsButton" aria-label="打开设置">⚙</button>
+        </div>
+      </header>
+      <section id="thread" aria-live="polite">
+        <div id="welcome">
+          <div class="hero-icon">Q</div>
+          <div class="eyebrow">YOUR LOCAL INTELLIGENCE</div>
+          <h1>从一个问题开始。</h1>
+          <p>
+            由你的 GPU 驱动，与你一起思考。<br />轻量对话，直接连接原生推理引擎。
+          </p>
+          <div class="suggestions">
+            <button data-prompt="请介绍一下你自己。">
+              认识一下 <span>↗</span
+              ><small>让模型做个简短的自我介绍</small></button
+            ><button data-prompt="用一个简单例子解释 KV Cache。">
+              深入理解 <span>↗</span
+              ><small>从 KV Cache 开始探索推理</small></button
+            ><button data-prompt="用 C++ 写一个二分查找，并解释边界。">
+              一起写代码 <span>↗</span><small>代码、思路与具体实现</small>
+            </button>
+          </div>
+        </div>
+        <div id="messages"></div>
+      </section>
+      <div class="composer-area">
+        <div id="error" role="alert" hidden></div>
+        <form id="composer">
+          <input
+            id="imageFiles"
+            type="file"
+            accept="image/png,image/jpeg"
+            multiple
+            hidden
+          />
+          <div
+            id="attachments"
+            class="attachments"
+            hidden
+            aria-label="待发送图片"
+          ></div>
+          <textarea
+            id="input"
+            rows="2"
+            placeholder="发送消息…"
+            aria-label="消息输入"
+          ></textarea>
+          <div class="composer-tools">
+            <div>
+              <button
+                type="button"
+                id="attach"
+                disabled
+                title="当前后端仅支持文本，视觉推理接通后开放附件"
+                aria-label="图片附件暂不可用"
+              >
+                ＋</button
+              ><span id="capability">纯文本模式 · 图片暂未开放</span>
+            </div>
+            <button type="submit" id="send" aria-label="发送消息">↑</button
+            ><button type="button" id="stop" hidden>■ 停止生成</button>
+          </div>
+        </form>
+        <div class="composer-note">
+          Enter 发送 · Shift + Enter 换行
+          <span>本地模型的回答可能有误，请核对重要信息。</span>
+        </div>
+      </div>
+    </main>
+    <dialog id="settings">
+      <form method="dialog">
+        <button class="close" aria-label="关闭设置">×</button>
+        <div class="eyebrow">SESSION SETTINGS</div>
+        <h2>对话设置</h2>
+        <label for="maxTokens"
+          >单轮最大输出 <output id="maxTokensValue">128 token</output></label
+        ><input id="maxTokens" type="range" min="1" max="256" value="128" />
+        <p>达到上限会停止；模型也可能提前结束。</p>
+        <div class="settings-divider"></div>
+        <h3>服务配置</h3>
+        <dl id="serverInfo"></dl>
+        <p>
+          模型、上下文和缓存由服务启动参数决定。首版不在网页中重新加载模型。
+        </p>
+        <button class="clear" id="deleteChat" type="button">
+          删除当前对话
+        </button>
+      </form>
+    </dialog>
+  </body>
+</html>

@@ -21,6 +21,9 @@ with tempfile.TemporaryDirectory() as temp:
     subprocess.run([sys.argv[2], str(root/'model.safetensors')], check=True)
     run({'scalar': entry(shape=[], offsets=[0,4])}, b'1234')
     run({'empty': entry(shape=[0], offsets=[0,0])})
+    run({'rank5': entry(shape=[1]*5, offsets=[0,4])}, bytes(4))
+    run({'rank8': entry(shape=[1]*8, offsets=[0,4])}, bytes(4))
+    run({'rank9': entry(shape=[1]*9, offsets=[0,4])}, bytes(4), False)
     run({})
     for dtype, size in [('F32',4),('F16',2),('BF16',2),('I8',1),('I32',4),('I64',8)]:
         run({'x':entry(dtype,[1],[0,size])}, bytes(size))

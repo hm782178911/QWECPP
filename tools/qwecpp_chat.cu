@@ -1,4 +1,4 @@
-#include "models/qwen3.cuh"
+#include "runtime/text_model.cuh"
 #include "runtime/device_options.h"
 #include "runtime/tokenizer.h"
 #include <algorithm>
@@ -169,11 +169,10 @@ int main(int argc, char **argv) {
         }
         auto load_start = Clock::now();
         qwe::Tokenizer tokenizer(directory);
-        if (tokenizer.encode("<|im_start|>") != std::vector<int>{151644} ||
-            tokenizer.encode("<|im_end|>") != std::vector<int>{151645})
-            throw std::runtime_error("unsupported Qwen3 special token IDs");
+        auto end_ids=tokenizer.encode("<|im_end|>"),eos_ids=tokenizer.encode("<|endoftext|>");
+        if(end_ids.size()!=1||eos_ids.size()!=1)throw std::runtime_error("unsupported special tokens");
         std::cout << "正在加载模型……" << std::endl;
-        qwe::Qwen3 model(directory, options);
+        qwe::TextModel model(directory, options);
         std::cout << "可以开始聊天。/clear 清空对话，/exit 退出。" << std::endl;
         double load_ms = ms(load_start, Clock::now());
         std::vector<Message> history;
@@ -248,7 +247,7 @@ int main(int argc, char **argv) {
                     comm.total_ms+=step.total_ms; comm.source_wait_ms+=step.source_wait_ms;
                 }
                 int id = (int)(std::max_element(logits.begin(), logits.end()) - logits.begin());
-                if (id == 151645 || id == 151643) {
+                if (id == end_ids[0] || id == eos_ids[0]) {
                     stopped = true;
                     break;
                 }
